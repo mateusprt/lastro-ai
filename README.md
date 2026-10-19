@@ -10,65 +10,52 @@ Editor de arquitetura e motor de simulação de capacidade. Detalhes de produto 
 
 ```bash
 npm install
-npm run typecheck      # TypeScript em modo estrito
-npm test               # testes do motor (Vitest + fast-check)
-npm run test:coverage  # cobertura do motor
+npm run dev            # API (porta 3333) + frontend (http://localhost:5173)
+npm run typecheck      # TypeScript estrito, servidor e web
+npm run lint           # ESLint, inclusive a regra que impede o frontend de importar o motor
+npm test               # motor, API e domínio do frontend (Vitest + fast-check)
+npm run build:web      # build de produção do frontend em dist/web
 ```
+
+No desenvolvimento, o Vite encaminha `/api` para a API. Em produção, o Caddy serve `dist/web` e encaminha `/api` para a API, no mesmo domínio.
 
 ## Estrutura
 
 ```
 src/
+  shared/
+    simulation.ts            contrato de entrada e saída da simulação (só tipos)
   server/
     engine/                  motor de simulação (usado somente pela API)
-      index.ts               interface pública: a API importa só daqui
-      types.ts               tipos de entrada e saída
-      errors.ts              SimulationValidationError e códigos de problema
-      GraphValidator.ts      ciclos, referências, duplicidades e limites
-      TrafficPropagator.ts   ordenação topológica, visitas totais e síncronas
-      QueueModel.ts          fila M/M/c, Erlang B/C, servidores necessários
-      ComponentAnalyzer.ts   vazão, utilização, tempo de resposta, custo por componente
-      SystemAnalyzer.ts      gargalo, capacidades, ponta a ponta, segundo plano
-      ResponseCurveBuilder.ts curva tempo de resposta × tráfego
-      SimulationEngine.ts    orquestra as etapas
-      __tests__/
+    app.ts, index.ts         Express 5
+    routes/                  /api/health, /api/simulations, /api/waitlist (provisório)
+    controllers/  services/  middlewares/  validation/  http/
+  web/                       frontend React + Vite
+    index.html, main.tsx, App.tsx
+    http/                    cliente da API (cookies httpOnly, renovação em 401)
+    store/                   estado do editor (zustand, desfazer/refazer) e da simulação
+    domain/                  catálogo de componentes, modelos, formatação, diagnóstico
+    hooks/                   simulação automática, rascunho local, carregar modelo
+    components/
+      canvas/                React Flow: nós, ligações, paleta
+      panels/                simulação e propriedades (abas)
+      results/               tabela de componentes e curva de resposta
+    styles/app.css
 ```
 
-## Uso do motor
+## Frontend
 
-```ts
-import { SimulationEngine, SimulationValidationError } from './server/engine/index.js';
+- **Editor**: React Flow (`@xyflow/react`). Arraste da paleta ou clique para adicionar. Para ligar, puxe da bolinha à direita de um componente até a da esquerda de outro. Ligações que criariam ciclo, duplicadas ou para o próprio componente são recusadas.
+- **Simulação automática**: cada edição chama `POST /api/simulations` com debounce de 300 ms e cancela a requisição anterior. Mover nós não dispara simulação. O último resultado continua visível, esmaecido, enquanto o novo é calculado ou se der erro.
+- **Feedback no diagrama**: cada nó mostra a utilização num medidor com a linha de carga (o limite seguro) e o status com ícone e texto. As ligações mostram a vazão.
+- **Painéis**: diagnóstico em linguagem simples sobre o canvas; abas "Simulação" (tráfego, limite seguro, capacidade, tempo de resposta, gargalo) e "Propriedades" (alternam conforme a seleção); tabela de componentes e curva de resposta com crosshair e visão em tabela.
+- **Plano Pro**: o custo aparece bloqueado com o selo "Pro"; "Cenários" e "Plano Pro em breve" abrem o diálogo da lista de espera, que registra o recurso que motivou o clique.
+- **Atalhos**: Ctrl/⌘+Z desfaz, Ctrl/⌘+Shift+Z ou Ctrl+Y refaz, Delete exclui a seleção, Esc limpa a seleção.
+- **Rascunho**: provisoriamente guardado no `localStorage` até existir o salvamento na API.
 
-const engine = new SimulationEngine();
+O frontend nunca importa `src/server`: a regra `no-restricted-imports` do ESLint bloqueia, e o build é conferido para não conter o motor.
 
-try {
-  const result = engine.run({
-    graph: {
-      components: [
-        { id: 'lb', name: 'Balanceador', type: 'load_balancer', instances: 1, serviceTimeMs: 1, monthlyCostPerInstance: 100 },
-        { id: 'app', name: 'API', type: 'app', instances: 4, serviceTimeMs: 20, monthlyCostPerInstance: 450 },
-        { id: 'db', name: 'Postgres', type: 'database', instances: 2, serviceTimeMs: 10, monthlyCostPerInstance: 1800 },
-      ],
-      links: [
-        { source: 'lb', target: 'app', callsPerRequest: 1, async: false },
-        { source: 'app', target: 'db', callsPerRequest: 0.4, async: false },
-      ],
-    },
-    entryPointId: 'lb',
-    trafficRps: 100,
-    safeUtilization: 0.8,
-  });
-
-  result.system.bottleneckId;    // 'app'
-  result.system.safeCapacityRps; // 160
-} catch (e) {
-  if (e instanceof SimulationValidationError) {
-    e.issues; // [{ code, message, componentIds?, linkIndex? }]
-  }
-}
-```
-
-## Modelo
+## Motor
 
 | Etapa | Fórmula |
 |---|---|
@@ -83,12 +70,14 @@ try {
 | Instâncias necessárias | `max(c, ⌈a / limite seguro⌉)` |
 | Status | crítico a partir do limite seguro; atenção a partir de 75% dele |
 
-Serviços externos são latência fixa: não têm fila, não entram no gargalo nem nas capacidades.
+Serviços externos são latência fixa: não têm fila, não entram no gargalo nem nas capacidades. Tempos e capacidades `null` significam "ilimitado". Erlang C é calculado pela recorrência de Erlang B, estável com milhares de instâncias. Um diagrama de 50 componentes roda em cerca de 2 ms (p95).
 
-Tempos e capacidades `null` no resultado significam "ilimitado": tempo infinito (componente saturado) ou capacidade sem limite. Assim o resultado é JSON válido.
+## API (até agora)
 
-Erlang C é calculado pela recorrência de Erlang B, sem fatoriais, e continua estável com milhares de instâncias.
+| Rota | Descrição |
+|---|---|
+| `GET /api/health` | Status da API |
+| `POST /api/simulations` | Valida com Joi (400 com os campos) e roda o motor (422 com os problemas do diagrama) |
+| `POST /api/waitlist/pro` | **Provisório**, em memória até existirem banco e autenticação |
 
-## Desempenho
-
-Medido localmente: diagrama de 50 componentes com curva de 50 pontos roda em cerca de 2 ms (p95) com 4 instâncias por componente e 10 ms (p95) com 500. A meta do TDD é 200 ms (p95).
+Ainda faltam autenticação, limites de plano no backend, `helmet`, limite de requisições, persistência no Postgres e a remoção dos campos de custo da resposta para o plano gratuito.

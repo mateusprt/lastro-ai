@@ -102,6 +102,13 @@ export class GraphValidator {
           componentIds: [c.id],
         });
       }
+      if (c.writeFraction !== undefined && !(Number.isFinite(c.writeFraction) && c.writeFraction >= 0 && c.writeFraction <= 1)) {
+        issues.push({
+          code: 'INVALID_WRITE_FRACTION',
+          message: `${label}: o percentual de escritas deve estar entre 0% e 100%.`,
+          componentIds: [c.id],
+        });
+      }
       if (!Number.isFinite(c.monthlyCostPerInstance) || c.monthlyCostPerInstance < 0) {
         issues.push({
           code: 'INVALID_COST',

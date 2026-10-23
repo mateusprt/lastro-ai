@@ -4,6 +4,7 @@ import { Canvas } from './components/canvas/Canvas.js';
 import { Palette } from './components/canvas/Palette.js';
 import { DiagnosisBar } from './components/DiagnosisBar.js';
 import { EmptyState } from './components/EmptyState.js';
+import { HelpDialog } from './components/HelpDialog.js';
 import { Header } from './components/Header.js';
 import { Sidebar } from './components/panels/Sidebar.js';
 import { ProDialog } from './components/ProDialog.js';
@@ -11,6 +12,7 @@ import { ResultsPanel } from './components/results/ResultsPanel.js';
 import { useAutoSimulation } from './hooks/useAutoSimulation.js';
 import { useDraftPersistence } from './hooks/useDraftPersistence.js';
 import { useEditor } from './store/editor.js';
+import { useUi } from './store/ui.js';
 
 function isTyping(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -46,10 +48,12 @@ export function App() {
   const draft = useDraftPersistence();
   useAutoSimulation();
   useShortcuts();
+  const paletteOpen = useUi((s) => s.paletteOpen);
+  const sidebarOpen = useUi((s) => s.sidebarOpen);
 
   return (
     <ReactFlowProvider>
-      <div className="app">
+      <div className={`app${paletteOpen ? '' : ' is-palette-collapsed'}${sidebarOpen ? '' : ' is-sidebar-collapsed'}`}>
         <Header draft={draft} />
         <Palette />
         <main className="stage">
@@ -62,6 +66,7 @@ export function App() {
         <ResultsPanel />
       </div>
       <ProDialog />
+      <HelpDialog />
     </ReactFlowProvider>
   );
 }

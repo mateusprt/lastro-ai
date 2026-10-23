@@ -14,7 +14,7 @@ export function StatusTag({ status, saturated = false }: { status: ComponentStat
   return (
     <span className={`status status-${status}`}>
       <Icon size={14} />
-      {saturated ? 'Saturado' : STATUS_LABEL[status]}
+      {saturated ? 'Sobrecarregado' : STATUS_LABEL[status]}
     </span>
   );
 }
@@ -25,24 +25,31 @@ interface GaugeProps {
   status: ComponentStatus;
   saturated: boolean;
   compact?: boolean;
+  /** Nome lido por leitores de tela. Padrão: "Utilização". */
+  label?: string;
+}
+
+/** Explicação do medidor para quem passa o mouse por cima. */
+function gaugeTitle(utilization: number, safeUtilization: number): string {
+  return `${formatPercent(utilization)} ocupado. O traço marca a ocupação máxima aceitável, ${formatPercent(safeUtilization)}.`;
 }
 
 /**
  * Medidor de utilização com a linha de carga: o traço marca o limite seguro,
  * como a marca de Plimsoll no casco indica até onde o navio pode afundar.
  */
-export function LoadGauge({ utilization, safeUtilization, status, saturated, compact = false }: GaugeProps) {
+export function LoadGauge({ utilization, safeUtilization, status, saturated, compact = false, label = 'Utilização' }: GaugeProps) {
   const fill = Math.min(1, Math.max(0, utilization));
   return (
-    <div className={`gauge${compact ? ' gauge-compact' : ''}`}>
+    <div className={`gauge${compact ? ' gauge-compact' : ''}`} title={gaugeTitle(utilization, safeUtilization)}>
       <div
         className="gauge-track"
         role="meter"
-        aria-label="Utilização"
+        aria-label={label}
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={Math.round(fill * 100)}
-        aria-valuetext={`${formatPercent(utilization)}, limite seguro ${formatPercent(safeUtilization)}`}
+        aria-valuetext={`${formatPercent(utilization)} ocupado, máximo aceitável ${formatPercent(safeUtilization)}`}
       >
         <div className={`gauge-fill gauge-${status}${saturated ? ' gauge-saturated' : ''}`} style={{ width: `${fill * 100}%` }} />
         <div className="gauge-line" style={{ left: `${safeUtilization * 100}%` }} />

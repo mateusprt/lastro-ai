@@ -1,7 +1,10 @@
-import type { SimulationResult } from '../../shared/simulation.js';
+import type { ComponentResult, SimulationResult } from '../../shared/simulation.js';
 import { formatMs, formatMultiplier, formatPercent, formatRps } from './format.js';
 
 export type DiagnosisTone = 'ok' | 'warning' | 'critical';
+
+/** Saídas quando o primário não dá conta das escritas. */
+const PRIMARY_WAYS_OUT = 'use uma máquina maior para o primário, reduza as escritas (cache, lotes) ou particione os dados';
 
 export interface Diagnosis {
   tone: DiagnosisTone;
@@ -36,13 +39,19 @@ export function diagnose(result: SimulationResult): Diagnosis {
     const needed = components
       .filter((c) => c.reachable && c.additionalInstances > 0)
       .map((c) => `${c.additionalInstances} ${c.additionalInstances === 1 ? 'instância' : 'instâncias'} em ${c.name || 'sem nome'}`);
+    const primaries = components.filter((c) => c.reachable && c.database?.primaryOverSafe).map((c) => c.name || 'sem nome');
+    const add = needed.length > 0 ? ` Para ficar abaixo de ${limit}, adicione ${joinList(needed)}.` : '';
+    const primaryNote =
+      primaries.length > 0
+        ? ` O primário de ${joinList(primaries)} não dá conta das escritas, e mais réplicas não resolvem: ${PRIMARY_WAYS_OUT}.`
+        : '';
     return {
       tone: 'critical',
       headline:
         saturated.length === 1
           ? `${saturated[0]!.name || 'Um componente'} não dá conta de ${formatRps(input.trafficRps)}: a fila cresce sem parar.`
           : `${saturated.length} componentes não dão conta de ${formatRps(input.trafficRps)}: as filas crescem sem parar.`,
-      detail: `O máximo hoje é ${formatRps(system.maxCapacityRps)}. Para ficar abaixo de ${limit}, adicione ${joinList(needed)}.`,
+      detail: `O máximo hoje é ${formatRps(system.maxCapacityRps)}.${add}${primaryNote}`,
     };
   }
 
@@ -52,6 +61,14 @@ export function diagnose(result: SimulationResult): Diagnosis {
       ? `Dentro do limite seguro de ${limit}, a arquitetura aguenta até ${formatRps(system.safeCapacityRps)}.`
       : `Dentro do limite seguro de ${limit}, a arquitetura aguenta até ${formatRps(system.safeCapacityRps)}, ${formatMultiplier(headroom)} o tráfego atual.`;
 
+  if (b.status === 'critical' && b.database?.primaryOverSafe) {
+    return {
+      tone: 'critical',
+      headline: `O primário de ${name} está acima do limite seguro, a ${formatPercent(b.database.primary.utilization)} de utilização.`,
+      detail: `Todas as escritas vão para ele, então mais réplicas não resolvem. Para voltar para baixo de ${limit}, ${PRIMARY_WAYS_OUT}.`,
+    };
+  }
+
   if (b.status === 'critical') {
     return {
       tone: 'critical',
@@ -60,11 +77,26 @@ export function diagnose(result: SimulationResult): Diagnosis {
     };
   }
 
+  const tone = b.status === 'warning' ? 'warning' : 'ok';
+  const limitedBy = b.database?.limitedBy ?? null;
+  if (limitedBy === 'primary') {
+    return {
+      tone,
+      headline: `O gargalo é o primário de ${name}, a ${formatPercent(b.database!.primary.utilization)} de utilização.`,
+      detail: `${capacity} Mais réplicas não aumentam esse limite, porque todas as escritas vão para o primário.`,
+    };
+  }
   return {
-    tone: b.status === 'warning' ? 'warning' : 'ok',
-    headline: `O gargalo é ${name}, a ${formatPercent(b.utilization)} de utilização.`,
+    tone,
+    headline: `${bottleneckLabel(b, limitedBy)}, a ${formatPercent(b.utilization)} de utilização.`,
     detail: capacity,
   };
+}
+
+function bottleneckLabel(b: ComponentResult, limitedBy: 'primary' | 'replicas' | null): string {
+  const name = b.name || 'Componente sem nome';
+  if (limitedBy !== 'replicas') return `O gargalo é ${name}`;
+  return b.database!.replicas!.servers === 1 ? `O gargalo é a réplica de ${name}` : `O gargalo são as réplicas de ${name}`;
 }
 
 function joinList(items: string[]): string {

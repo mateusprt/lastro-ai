@@ -16,6 +16,7 @@ const component = Joi.object({
   instances: Joi.number().integer().min(1).required(),
   serviceTimeMs: Joi.number().min(0).required(),
   monthlyCostPerInstance: Joi.number().min(0).required(),
+  writeFraction: Joi.number().min(0).max(1),
   position: Joi.object({ x: Joi.number().required(), y: Joi.number().required() }),
 });
 

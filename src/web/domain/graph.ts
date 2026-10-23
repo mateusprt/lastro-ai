@@ -16,6 +16,7 @@ export function toSimulationInput(doc: DiagramDoc): SimulationInput | null {
         instances: n.data.instances,
         serviceTimeMs: n.data.serviceTimeMs,
         monthlyCostPerInstance: n.data.monthlyCostPerInstance,
+        ...(n.data.type === 'database' && n.data.writeFraction !== undefined ? { writeFraction: n.data.writeFraction } : {}),
       })),
       links: doc.edges.map((e) => ({
         id: e.id,

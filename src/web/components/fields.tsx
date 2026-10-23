@@ -1,5 +1,7 @@
 import { useEffect, useId, useState, type ReactNode } from 'react';
 import { parseDecimal, toInputText } from '../domain/format.js';
+import type { GlossaryKey } from '../domain/glossary.js';
+import { InfoTip } from './InfoTip.js';
 
 interface NumberFieldProps {
   label: string;
@@ -12,13 +14,39 @@ interface NumberFieldProps {
   integer?: boolean;
   /** Mínimo exclusivo: o valor precisa ser maior que `min`. */
   exclusiveMin?: boolean;
+  /** Termo do glossário explicado pelo botão "?" ao lado do rótulo. */
+  info?: GlossaryKey;
+}
+
+/** Rótulo de campo com o botão "?" opcional. O botão fica fora do <label> para não focar o campo. */
+export function FieldLabel({
+  htmlFor,
+  info,
+  aside,
+  children,
+}: {
+  htmlFor: string;
+  info?: GlossaryKey | undefined;
+  /** Conteúdo alinhado à direita, como o valor de um controle deslizante. */
+  aside?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <div className="field-head">
+      <label htmlFor={htmlFor} className="field-label">
+        {children}
+      </label>
+      {info && <InfoTip term={info} />}
+      {aside && <span className="field-aside">{aside}</span>}
+    </div>
+  );
 }
 
 /**
  * Campo numérico que aceita vírgula decimal e só aplica valores válidos. Enquanto
  * o texto é inválido, mantém o último valor bom e mostra o motivo.
  */
-export function NumberField({ label, value, onChange, unit, hint, min, max, integer = false, exclusiveMin = false }: NumberFieldProps) {
+export function NumberField({ label, value, onChange, unit, hint, min, max, integer = false, exclusiveMin = false, info }: NumberFieldProps) {
   const id = useId();
   const [text, setText] = useState(() => toInputText(value));
   const [error, setError] = useState<string | null>(null);
@@ -39,9 +67,9 @@ export function NumberField({ label, value, onChange, unit, hint, min, max, inte
 
   return (
     <div className="field">
-      <label htmlFor={id} className="field-label">
+      <FieldLabel htmlFor={id} info={info}>
         {label}
-      </label>
+      </FieldLabel>
       <div className={`field-control${error ? ' has-error' : ''}`}>
         <input
           id={id}
@@ -94,15 +122,30 @@ export function TextField({ label, value, onChange, placeholder }: { label: stri
   );
 }
 
-export function Toggle({ label, checked, onChange, hint }: { label: string; checked: boolean; onChange: (v: boolean) => void; hint?: ReactNode }) {
+export function Toggle({
+  label,
+  checked,
+  onChange,
+  hint,
+  info,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  hint?: ReactNode;
+  info?: GlossaryKey;
+}) {
   const id = useId();
   return (
     <div className="field">
-      <label className="toggle" htmlFor={id}>
-        <input id={id} type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
-        <span className="toggle-box" aria-hidden="true" />
-        <span>{label}</span>
-      </label>
+      <div className="field-head">
+        <label className="toggle" htmlFor={id}>
+          <input id={id} type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+          <span className="toggle-box" aria-hidden="true" />
+          <span>{label}</span>
+        </label>
+        {info && <InfoTip term={info} />}
+      </div>
       {hint && <p className="field-hint toggle-hint">{hint}</p>}
     </div>
   );

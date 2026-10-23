@@ -14,7 +14,7 @@ function wasSubscribed(): boolean {
 }
 
 const INTRO: Record<string, string> = {
-  header: 'O Plano Pro é para quem leva o resultado ao gestor e planeja com frequência.',
+  header: 'O Plano Pro é para quem leva o resultado e planeja com frequência.',
   cost: 'O custo da arquitetura e de cada cenário faz parte do Plano Pro.',
   scenarios: 'Salvar e comparar cenários, como "Black Friday 3×", faz parte do Plano Pro.',
   report: 'O relatório para compartilhar com o gestor faz parte do Plano Pro.',
@@ -59,10 +59,9 @@ export function ProDialog() {
       <p>{INTRO[feature ?? 'header']}</p>
       <ul className="pro-list">
         <li>Diagramas maiores e ilimitados</li>
-        <li>Cenários salvos e comparados lado a lado</li>
-        <li>Relatório para compartilhar com o gestor</li>
+        <li>Cenários comparados lado a lado</li>
+        <li>Relatório para compartilhar</li>
         <li>Custo atual e custo extra de cada cenário</li>
-        <li>Mais adiante, calibração com os dados reais da sua conta AWS</li>
       </ul>
       {state === 'done' ? (
         <p className="pro-done">

@@ -13,7 +13,7 @@ npm install
 npm run dev            # API (porta 3333) + frontend (http://localhost:5173)
 npm run typecheck      # TypeScript estrito, servidor e web
 npm run lint           # ESLint, inclusive a regra que impede o frontend de importar o motor
-npm test               # motor, API e domínio do frontend (Vitest + fast-check)
+npm test               # motor e API (Vitest + fast-check)
 npm run build:web      # build de produção do frontend em dist/web
 ```
 

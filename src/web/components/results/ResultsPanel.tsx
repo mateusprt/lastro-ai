@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useEditor } from '../../store/editor.js';
 import { ChevronIcon } from '../icons.js';
+import { InfoTip } from '../InfoTip.js';
 import { ComponentTable } from './ComponentTable.js';
 import { ResponseCurve } from './ResponseCurve.js';
 
@@ -20,11 +21,14 @@ export function ResultsPanel() {
       {open && (
         <div className="results-body">
           <div className="results-col results-table-col">
-            <h3 className="sub-title">Componentes</h3>
+            <h3 className="sub-title">Cada componente, do mais ocupado ao mais folgado</h3>
             <ComponentTable />
           </div>
           <div className="results-col results-curve-col">
-            <h3 className="sub-title">Curva de resposta</h3>
+            <h3 className="sub-title sub-title-row">
+              Como o tempo de resposta cresce com os acessos
+              <InfoTip term="curve" />
+            </h3>
             <ResponseCurve />
           </div>
         </div>

@@ -135,7 +135,13 @@ export const CloseIcon = (p: IconProps) => (
     <path d="m5 5 10 10M15 5 5 15" />
   </Svg>
 );
-export const SpinnerIcon = (p: IconProps) => (
+export const HelpIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <circle cx="10" cy="10" r="7" />
+    <path d="M8 8a2 2 0 1 1 2.8 1.8c-.5.3-.8.7-.8 1.2v.5M10 13.8v.2" />
+  </Svg>
+);
+export const SpinnerIcon =(p: IconProps) => (
   <Svg {...p} className={`spin ${p.className ?? ''}`}>
     <path d="M10 3a7 7 0 1 1-7 7" />
   </Svg>

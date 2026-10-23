@@ -1,7 +1,8 @@
 import { memo } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { kindOf } from '../../domain/catalog.js';
-import { formatMs, formatNumber } from '../../domain/format.js';
+import { formatMs, formatNumber, formatPercent } from '../../domain/format.js';
+import { DEFAULT_WRITE_FRACTION } from '../../../shared/simulation.js';
 import { useEditor } from '../../store/editor.js';
 import { useSimulation } from '../../store/simulation.js';
 import type { ComponentNode } from '../../store/types.js';
@@ -16,12 +17,23 @@ function ComponentNodeViewImpl({ id, data, selected }: NodeProps<ComponentNode>)
   const safe = useEditor((s) => s.safeUtilization);
   const kind = kindOf(data.type);
   const external = data.type === 'external';
+  const database = data.type === 'database';
 
   const spec = external
     ? `Latência fixa de ${formatMs(data.serviceTimeMs)}`
-    : `${data.instances} ${data.instances === 1 ? 'instância' : 'instâncias'}, ${formatMs(data.serviceTimeMs)} por requisição`;
+    : database
+      ? `${dbInstances(data.instances)}, ${formatMs(data.serviceTimeMs)} por consulta, ${formatPercent(data.writeFraction ?? DEFAULT_WRITE_FRACTION)} escritas`
+      : `${data.instances} ${data.instances === 1 ? 'instância' : 'instâncias'}, ${formatMs(data.serviceTimeMs)} por requisição`;
 
   const unreachable = result && !result.reachable;
+  const db = result?.database;
+  const need = db?.primaryOverSafe
+    ? 'Primário no limite'
+    : result && result.additionalInstances > 0
+      ? database
+        ? `+${result.additionalInstances} ${result.additionalInstances === 1 ? 'réplica' : 'réplicas'}`
+        : `+${result.additionalInstances} ${result.additionalInstances === 1 ? 'instância' : 'instâncias'}`
+      : null;
 
   return (
     <div
@@ -34,9 +46,9 @@ function ComponentNodeViewImpl({ id, data, selected }: NodeProps<ComponentNode>)
       ].join(' ')}
     >
       {isEntry && (
-        <div className="node-entry" title="O tráfego de entrada chega aqui">
+        <div className="node-entry" title="Os acessos dos usuários chegam por este componente">
           <EntryIcon size={14} />
-          Entrada
+          Acessos chegam aqui
         </div>
       )}
       <Handle type="target" position={Position.Left} className="handle" />
@@ -55,22 +67,43 @@ function ComponentNodeViewImpl({ id, data, selected }: NodeProps<ComponentNode>)
         {!result ? (
           <span className="node-muted">Aguardando simulação</span>
         ) : unreachable ? (
-          <span className="node-muted">Sem tráfego: nada chega aqui a partir da entrada</span>
+          <span className="node-muted">Nenhum acesso chega aqui. Ligue-o a partir de um componente que recebe acessos.</span>
         ) : external ? (
-          <span className="node-muted">{formatNumber(result.throughputRps)} chamadas/s, sem fila</span>
+          <span className="node-muted">{formatNumber(result.throughputRps)} chamadas por segundo. Serviço externo, sem fila.</span>
         ) : (
           <>
-            <LoadGauge utilization={result.utilization} safeUtilization={safe} status={result.status} saturated={result.saturated} />
+            {db?.replicas ? (
+              <div className="node-gauges">
+                <span className="node-gauge-label" title="Recebe todas as gravações">
+                  Primário
+                </span>
+                <LoadGauge compact label="Utilização do primário" utilization={db.primary.utilization} safeUtilization={safe} status={db.primary.status} saturated={db.primary.saturated} />
+                <span className="node-gauge-label" title="Dividem as leituras">
+                  Réplicas
+                </span>
+                <LoadGauge compact label="Utilização das réplicas" utilization={db.replicas.utilization} safeUtilization={safe} status={db.replicas.status} saturated={db.replicas.saturated} />
+              </div>
+            ) : (
+              <LoadGauge utilization={result.utilization} safeUtilization={safe} status={result.status} saturated={result.saturated} />
+            )}
             <div className="node-foot">
               <StatusTag status={result.status} saturated={result.saturated} />
-              {result.additionalInstances > 0 && <span className="node-need">+{result.additionalInstances} inst.</span>}
+              {need && <span className="node-need">{need}</span>}
             </div>
+            {db?.replicas && <span className="node-caveat">Otimista: sem locks, conexões e atraso de réplica</span>}
           </>
         )}
       </div>
       <Handle type="source" position={Position.Right} className="handle" />
     </div>
   );
+}
+
+/** "1 instância" ou "1 primário + 2 réplicas". */
+function dbInstances(instances: number): string {
+  if (instances === 1) return '1 instância';
+  const replicas = instances - 1;
+  return `1 primário + ${replicas} ${replicas === 1 ? 'réplica' : 'réplicas'}`;
 }
 
 export const ComponentNodeView = memo(ComponentNodeViewImpl);

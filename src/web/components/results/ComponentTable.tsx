@@ -2,7 +2,9 @@ import { kindOf } from '../../domain/catalog.js';
 import { formatMs, formatRps } from '../../domain/format.js';
 import { useEditor } from '../../store/editor.js';
 import { useSimulation } from '../../store/simulation.js';
+import type { GlossaryKey } from '../../domain/glossary.js';
 import { TypeIcon } from '../icons.js';
+import { InfoTip } from '../InfoTip.js';
 import { LoadGauge, StatusTag } from '../Status.js';
 
 /** Tabela de componentes, do mais carregado para o menos. Clicar seleciona no diagrama. */
@@ -13,7 +15,7 @@ export function ComponentTable() {
   const select = useEditor((s) => s.select);
   const selectedId = useEditor((s) => s.nodes.find((n) => n.selected)?.id);
 
-  if (!result) return <p className="empty-hint">Os resultados aparecem aqui quando o diagrama tiver um ponto de entrada.</p>;
+  if (!result) return <p className="empty-hint">Os resultados aparecem aqui quando algum componente estiver marcado para receber os acessos.</p>;
 
   const rows = [...result.components].sort((a, b) => {
     if (a.reachable !== b.reachable) return a.reachable ? -1 : 1;
@@ -27,17 +29,17 @@ export function ComponentTable() {
         <thead>
           <tr>
             <th scope="col">Componente</th>
-            <th scope="col" className="num">
-              Vazão
-            </th>
-            <th scope="col">Utilização</th>
-            <th scope="col">Status</th>
-            <th scope="col" className="num">
+            <Header className="num" info="throughput">
+              Recebe
+            </Header>
+            <Header info="utilization">Ocupação</Header>
+            <th scope="col">Situação</th>
+            <Header className="num" info="responseTime">
               Tempo de resposta
-            </th>
-            <th scope="col" className="num">
+            </Header>
+            <Header className="num" info="requiredInstances">
               Instâncias
-            </th>
+            </Header>
           </tr>
         </thead>
         <tbody>
@@ -58,14 +60,17 @@ export function ComponentTable() {
                     </span>
                   </button>
                 </th>
-                <td className="num">{c.reachable ? formatRps(c.throughputRps) : 'Sem tráfego'}</td>
+                <td className="num">{c.reachable ? formatRps(c.throughputRps) : 'Nenhum acesso'}</td>
                 <td>{c.reachable && !external ? <LoadGauge compact utilization={c.utilization} safeUtilization={safe} status={c.status} saturated={c.saturated} /> : <span className="muted">Sem fila</span>}</td>
                 <td>{c.reachable && !external ? <StatusTag status={c.status} saturated={c.saturated} /> : null}</td>
-                <td className="num">{!c.reachable ? '' : c.saturated ? 'Fila sem limite' : formatMs(c.responseTimeMs)}</td>
+                <td className="num">{!c.reachable ? '' : c.saturated ? 'Sobrecarregado' : formatMs(c.responseTimeMs)}</td>
                 <td className="num">
                   {external ? '' : c.additionalInstances > 0 ? (
                     <>
-                      {c.instances} <span className="delta">→ {c.requiredInstances}</span>
+                      {c.instances}{' '}
+                      <span className="delta" title={`Recomendado: ${c.requiredInstances}`}>
+                        → {c.requiredInstances}
+                      </span>
                     </>
                   ) : (
                     c.instances
@@ -77,5 +82,17 @@ export function ComponentTable() {
         </tbody>
       </table>
     </div>
+  );
+}
+
+/** Cabeçalho de coluna com o botão "?". O clique no botão não ordena nem seleciona nada. */
+function Header({ info, className, children }: { info: GlossaryKey; className?: string; children: string }) {
+  return (
+    <th scope="col" {...(className ? { className } : {})}>
+      <span className="th-term">
+        {children}
+        <InfoTip term={info} />
+      </span>
+    </th>
   );
 }

@@ -1,9 +1,11 @@
 import { useId } from 'react';
-import { formatBRL, formatMs, formatMultiplier, formatPercent, formatRps } from '../../domain/format.js';
+import { formatBRL, formatMs, formatMultiplier, formatPercent, formatRps, formatVolume } from '../../domain/format.js';
+import type { GlossaryKey } from '../../domain/glossary.js';
 import { useEditor } from '../../store/editor.js';
 import { useSimulation } from '../../store/simulation.js';
 import { useUi } from '../../store/ui.js';
-import { NumberField } from '../fields.js';
+import { FieldLabel, NumberField } from '../fields.js';
+import { InfoTip } from '../InfoTip.js';
 import { LockIcon } from '../icons.js';
 
 /** Topo "redondo" para o controle deslizante de tráfego. */
@@ -32,9 +34,19 @@ export function SimulationPanel() {
 
   return (
     <section className="panel simulation" aria-label="Simulação">
+      <p className="panel-intro">Diga quantos acessos chegam e veja até onde a arquitetura aguenta. Os números se atualizam sozinhos.</p>
 
       <div className="traffic">
-        <NumberField label="Tráfego de entrada" unit="req/s" value={traffic} min={0} max={10_000_000} onChange={setTraffic} />
+        <NumberField
+          label="Acessos por segundo"
+          unit="req/s"
+          value={traffic}
+          min={0}
+          max={10_000_000}
+          onChange={setTraffic}
+          info="traffic"
+          hint={formatVolume(traffic)}
+        />
         <input
           id={sliderId}
           type="range"
@@ -48,41 +60,51 @@ export function SimulationPanel() {
       </div>
 
       <div className="field">
-        <label htmlFor={safeId} className="field-label field-label-row">
-          Limite seguro de utilização <output htmlFor={safeId}>{formatPercent(safe)}</output>
-        </label>
+        <FieldLabel htmlFor={safeId} info="safeUtilization" aside={<output htmlFor={safeId}>{formatPercent(safe)}</output>}>
+          Ocupação máxima aceitável
+        </FieldLabel>
         <input id={safeId} type="range" min={50} max={95} step={5} value={Math.round(safe * 100)} onChange={(e) => setSafe(Number(e.target.value) / 100)} />
-        <p className="field-hint">Acima dele o componente fica crítico. Perto de 100%, a fila cresce muito rápido.</p>
+        <p className="field-hint">Quanto cada componente pode ficar ocupado sem risco. Acima disso ele fica vermelho. 80% é um bom padrão.</p>
       </div>
 
       {sys && (
         <dl className={`stats${stale ? ' is-stale' : ''}`}>
           <div className="stat">
-            <dt>Capacidade segura</dt>
+            <StatTerm info="safeCapacity">Aguenta com folga até</StatTerm>
             <dd>{formatRps(sys.safeCapacityRps)}</dd>
-            {sys.safeCapacityRps !== null && traffic > 0 && <p>{formatMultiplier(sys.safeCapacityRps / traffic)} o tráfego atual</p>}
+            {sys.safeCapacityRps !== null && traffic > 0 && <p>{formatMultiplier(sys.safeCapacityRps / traffic)} os acessos de agora</p>}
           </div>
           <div className="stat">
-            <dt>Tempo de resposta</dt>
-            <dd>{sys.responseTimeMs === null ? 'Saturado' : formatMs(sys.responseTimeMs)}</dd>
-            <p>{sys.responseTimeMs === null ? 'A fila cresce sem parar' : 'Média de ponta a ponta'}</p>
+            <StatTerm info="responseTime">Tempo de resposta</StatTerm>
+            <dd>{sys.responseTimeMs === null ? 'Sobrecarregado' : formatMs(sys.responseTimeMs)}</dd>
+            <p>{sys.responseTimeMs === null ? 'A espera cresce sem parar' : 'Quanto o usuário espera, em média'}</p>
           </div>
           <div className="stat">
-            <dt>Gargalo</dt>
+            <StatTerm info="bottleneck">Gargalo</StatTerm>
             <dd className="stat-name">{bottleneck ? bottleneck.name || 'Sem nome' : 'Nenhum'}</dd>
-            {bottleneck && <p>Satura com {formatRps(sys.maxCapacityRps)}</p>}
+            <p>{bottleneck ? `Trava a partir de ${formatRps(sys.maxCapacityRps)}` : 'Nada com fila recebe acessos'}</p>
           </div>
           {sys.hasBackgroundWork && (
             <div className="stat">
-              <dt>Segundo plano</dt>
-              <dd>{sys.backgroundDelayMs === null ? 'Saturado' : formatMs(sys.backgroundDelayMs)}</dd>
-              <p>Para concluir o trabalho assíncrono</p>
+              <StatTerm info="background">Segundo plano</StatTerm>
+              <dd>{sys.backgroundDelayMs === null ? 'Sobrecarregado' : formatMs(sys.backgroundDelayMs)}</dd>
+              <p>Para terminar o que roda sem o usuário esperar</p>
             </div>
           )}
           <CostStat />
         </dl>
       )}
     </section>
+  );
+}
+
+/** Título de um número do resumo, com o botão "?". */
+function StatTerm({ info, children }: { info: GlossaryKey; children: string }) {
+  return (
+    <dt className="stat-term">
+      {children}
+      <InfoTip term={info} />
+    </dt>
   );
 }
 

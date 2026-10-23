@@ -75,8 +75,8 @@ export function ResponseCurve() {
       <div className="curve-bar">
         <p className="curve-caption">
           {current === null
-            ? `Com ${formatRps(input.trafficRps)} o sistema satura. A curva vai até perto da capacidade máxima.`
-            : `Hoje: ${formatMs(current)} com ${formatRps(input.trafficRps)}. O tempo dispara perto de ${formatRps(system.maxCapacityRps)}.`}
+            ? `Com ${formatRps(input.trafficRps)} o sistema fica sobrecarregado. A curva vai até perto do máximo que ele aguenta.`
+            : `Agora: ${formatMs(current)} com ${formatRps(input.trafficRps)}. A espera dispara perto de ${formatRps(system.maxCapacityRps)}.`}
         </p>
         <button type="button" className="btn btn-quiet btn-small" onClick={() => setAsTable((v) => !v)} aria-pressed={asTable}>
           {asTable ? 'Ver gráfico' : 'Ver tabela'}
@@ -89,7 +89,7 @@ export function ResponseCurve() {
             <thead>
               <tr>
                 <th scope="col" className="num">
-                  Tráfego
+                  Acessos
                 </th>
                 <th scope="col" className="num">
                   Tempo de resposta
@@ -130,17 +130,17 @@ export function ResponseCurve() {
               </text>
             ))}
             <text className="axis-unit" x={M.left} y={10}>
-              ms
+              tempo de resposta (ms)
             </text>
             <text className="axis-unit" x={width - M.right} y={H - 10} textAnchor="end">
-              req/s
+              acessos (req/s)
             </text>
 
             {safeX !== null && safeX <= xMax && (
               <g>
                 <line className="safe-line" x1={sx(safeX)} x2={sx(safeX)} y1={M.top} y2={M.top + ih} />
                 <text className="safe-label" x={sx(safeX) - 6} y={M.top + 10} textAnchor="end">
-                  capacidade segura
+                  limite com folga
                 </text>
               </g>
             )}
@@ -151,7 +151,7 @@ export function ResponseCurve() {
               <g>
                 <circle className="current-dot" cx={sx(input.trafficRps)} cy={sy(current)} r={5} />
                 <text className="current-label" x={sx(input.trafficRps) + 9} y={sy(current) - 8}>
-                  atual
+                  agora
                 </text>
               </g>
             )}

@@ -4,7 +4,7 @@ import type { DraftStatus } from '../hooks/useDraftPersistence.js';
 import { useLoadDoc } from '../hooks/useLoadDoc.js';
 import { useEditor } from '../store/editor.js';
 import { useUi } from '../store/ui.js';
-import { ChevronIcon, LoadLineMark, RedoIcon, UndoIcon } from './icons.js';
+import { ChevronIcon, HelpIcon, LoadLineMark, RedoIcon, UndoIcon } from './icons.js';
 
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 const MOD = isMac ? '⌘' : 'Ctrl';
@@ -15,6 +15,7 @@ export function Header({ draft }: { draft: DraftStatus }) {
   const canUndo = useEditor((s) => s.history.past.length > 0);
   const canRedo = useEditor((s) => s.history.future.length > 0);
   const openPro = useUi((s) => s.openPro);
+  const openHelp = useUi((s) => s.openHelp);
 
   return (
     <header className="topbar">
@@ -39,6 +40,10 @@ export function Header({ draft }: { draft: DraftStatus }) {
       </div>
 
       <div className="topbar-group topbar-end">
+        <button type="button" className="btn btn-quiet" onClick={openHelp}>
+          <HelpIcon size={18} />
+          Como funciona
+        </button>
         <button type="button" className="btn btn-quiet" onClick={() => openPro('scenarios')}>
           Cenários <span className="pro-badge">Pro</span>
         </button>

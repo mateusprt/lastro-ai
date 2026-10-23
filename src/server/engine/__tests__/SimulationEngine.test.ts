@@ -25,7 +25,9 @@ describe('SimulationEngine: diagrama de referência a 100 req/s (valores conferi
     expect(c.app!.utilization).toBeCloseTo(0.5, 9); // 100 × 0,020 / 4
     expect(c.cache!.utilization).toBeCloseTo(0.1, 9);
     expect(c.db!.throughputRps).toBeCloseTo(80, 9); // 0,8 visita
-    expect(c.db!.utilization).toBeCloseTo(0.4, 9); // 80 × 0,010 / 2
+    expect(c.db!.database!.primary.utilization).toBeCloseTo(0.16, 9); // 16 escritas/s × 0,010
+    expect(c.db!.database!.replicas!.utilization).toBeCloseTo(0.32, 9); // 64 leituras/s × 0,010 / 2
+    expect(c.db!.utilization).toBeCloseTo(0.32, 9); // a maior das duas filas
     expect(c.worker!.utilization).toBeCloseTo(0.3, 9); // 20 × 0,030 / 2
     expect(c.pay!.utilization).toBe(0);
   });
@@ -33,7 +35,8 @@ describe('SimulationEngine: diagrama de referência a 100 req/s (valores conferi
   it('tempo de resposta por componente (M/M/1 e M/M/c)', () => {
     expect(c.lb!.responseTimeMs).toBeCloseTo(1 / 0.9, 9); // S / (1 − ρ)
     expect(c.app!.responseTimeMs).toBeCloseTo(mmcResponseMs(100, 20, 4), 9);
-    expect(c.db!.responseTimeMs).toBeCloseTo(mmcResponseMs(80, 10, 2), 9);
+    // Média ponderada: 20% no primário (M/M/1), 80% nas réplicas (M/M/2).
+    expect(c.db!.responseTimeMs).toBeCloseTo(0.2 * mmcResponseMs(16, 10, 1) + 0.8 * mmcResponseMs(64, 10, 2), 9);
     expect(c.pay!.responseTimeMs).toBe(200); // latência fixa, sem fila
   });
 
@@ -53,7 +56,9 @@ describe('SimulationEngine: diagrama de referência a 100 req/s (valores conferi
     expect(r.system.bottleneckId).toBe('app');
     expect(r.system.maxCapacityRps).toBeCloseTo(200, 9); // 4 / 0,020
     expect(r.system.safeCapacityRps).toBeCloseTo(160, 9);
-    expect(c.db!.maxEntryRps).toBeCloseTo(250, 9); // 2 / (0,8 × 0,010)
+    expect(c.db!.maxEntryRps).toBeCloseTo(312.5, 9); // réplicas: 2 / (0,8 × 0,8 × 0,010)
+    expect(c.db!.database!.primary.maxEntryRps).toBeCloseTo(625, 9); // 1 / (0,8 × 0,2 × 0,010)
+    expect(c.db!.database!.limitedBy).toBe('replicas');
   });
 
   it('Lei de Little no sistema: N = λ × R', () => {
@@ -61,7 +66,7 @@ describe('SimulationEngine: diagrama de referência a 100 req/s (valores conferi
   });
 
   it('custos e status', () => {
-    expect(r.system.monthlyCost).toBe(6500);
+    expect(r.system.monthlyCost).toBe(8300);
     expect(r.system.extraMonthlyCost).toBe(0);
     expect(r.components.every((x) => x.status === 'ok')).toBe(true);
     expect(r.system.saturated).toBe(false);
@@ -96,10 +101,11 @@ describe('SimulationEngine: cenários', () => {
     expect(r.system.saturated).toBe(true);
     expect(r.system.responseTimeMs).toBeNull();
     expect(r.system.requestsInFlight).toBeNull();
-    expect(r.system.backgroundDelayMs).toBeNull(); // banco saturado: 240 × 0,010 = 2,4 > 2
+    // Fila → worker → banco não passa pelo app saturado: réplicas a 192 × 0,010 / 2 = 96%.
+    expect(r.system.backgroundDelayMs).not.toBeNull();
 
     expect(c.app!.requiredInstances).toBe(8); // 6 / 0,8 = 7,5
-    expect(c.db!.requiredInstances).toBe(3); // 2,4 / 0,8 = 3
+    expect(c.db!.requiredInstances).toBe(4); // 1 primário + réplicas para 1,92 / 0,8 = 2,4 → 3
     expect(c.worker!.requiredInstances).toBe(3); // 1,8 / 0,8 = 2,25
     expect(c.lb!.requiredInstances).toBe(1);
     expect(r.system.extraMonthlyCost).toBe(4 * 450 + 1800 + 300);
@@ -145,7 +151,7 @@ describe('SimulationEngine: cenários', () => {
     expect(r.system.bottleneckId).toBe('app');
     expect(r.system.responseTimeMs).toBeCloseTo(run(ecommerce(), 100).system.responseTimeMs!, 9);
     // O custo dele continua contando: a instância existe.
-    expect(r.system.monthlyCost).toBe(6500 + 999);
+    expect(r.system.monthlyCost).toBe(8300 + 999);
   });
 
   it('só serviços externos: capacidade ilimitada', () => {
@@ -204,6 +210,98 @@ describe('SimulationEngine: cenários', () => {
   });
 });
 
+/**
+ * Banco com primário e réplicas. A API tem folga de sobra para o banco ser o
+ * único limite; cada requisição faz 0,8 consulta de 10 ms.
+ */
+function withDatabase(instances: number, writeFraction?: number): ArchitectureGraph {
+  return {
+    components: [component('api', 'app', 100, 1), component('db', 'database', instances, 10, 1800, writeFraction)],
+    links: [link('api', 'db', 0.8)],
+  };
+}
+
+describe('SimulationEngine: banco com primário e réplicas (valores conferidos à mão)', () => {
+  const db = (instances: number, trafficRps: number, writeFraction?: number) =>
+    byId(run(withDatabase(instances, writeFraction), trafficRps, 0.8, 'api')).db!;
+
+  it('uma instância continua uma fila M/M/1 com tudo', () => {
+    const c = db(1, 100, 0.3);
+    expect(c.utilization).toBeCloseTo(0.8, 9); // 80 × 0,010
+    expect(c.responseTimeMs).toBeCloseTo(mmcResponseMs(80, 10, 1), 9);
+    expect(c.maxEntryRps).toBeCloseTo(125, 9); // 1 / (0,8 × 0,010)
+    expect(c.database!.replicas).toBeNull();
+    expect(c.database!.limitedBy).toBeNull();
+  });
+
+  it('2 instâncias, 30% de escritas: as réplicas limitam a 179 req/s', () => {
+    const c = db(2, 100, 0.3);
+    expect(c.database!.primary.throughputRps).toBeCloseTo(24, 9);
+    expect(c.database!.replicas!.throughputRps).toBeCloseTo(56, 9);
+    expect(c.database!.primary.utilization).toBeCloseTo(0.24, 9);
+    expect(c.database!.replicas!.utilization).toBeCloseTo(0.56, 9);
+    expect(c.maxEntryRps).toBeCloseTo(1 / 0.0056, 9); // 178,57
+    expect(c.database!.primary.maxEntryRps).toBeCloseTo(1 / 0.0024, 9); // 416,67
+    expect(c.database!.limitedBy).toBe('replicas');
+    // 0,3 × 10 / (1 − 0,24) + 0,7 × 10 / (1 − 0,56)
+    expect(c.responseTimeMs).toBeCloseTo(0.3 * (10 / 0.76) + 0.7 * (10 / 0.44), 9);
+  });
+
+  it('com 4 instâncias o primário passa a limitar, e com 8 o limite não muda', () => {
+    const four = db(4, 100, 0.3);
+    expect(four.maxEntryRps).toBeCloseTo(1 / 0.0024, 9); // réplicas iriam a 3 / 0,0056 = 535,7
+    expect(four.database!.limitedBy).toBe('primary');
+    const eight = db(8, 100, 0.3);
+    expect(eight.maxEntryRps).toBeCloseTo(1 / 0.0024, 9);
+    expect(eight.database!.limitedBy).toBe('primary');
+  });
+
+  it('primário acima do limite: sinaliza que réplicas não resolvem', () => {
+    const c = db(8, 400, 0.3); // primário: 96 × 0,010 = 96%; réplicas: 224 × 0,010 / 7 = 32%
+    expect(c.database!.primary.utilization).toBeCloseTo(0.96, 9);
+    expect(c.database!.replicas!.utilization).toBeCloseTo(0.32, 9);
+    expect(c.database!.primaryOverSafe).toBe(true);
+    expect(c.status).toBe('critical');
+    expect(c.additionalInstances).toBe(0); // as réplicas já bastam para as leituras
+  });
+
+  it('instâncias para o limite seguro contam só as réplicas que as leituras pedem', () => {
+    const c = db(1, 150, 0.3); // 120 consultas/s: 1,2 Erlang não cabe numa instância
+    // Leituras: 84 × 0,010 = 0,84 → 0,84 / 0,8 = 1,05 → 2 réplicas + 1 primário.
+    expect(c.requiredInstances).toBe(3);
+    expect(c.database!.primaryOverSafe).toBe(false); // escritas: 36 × 0,010 = 36%
+    const after = byId(run(withDatabase(3, 0.3), 150, 0.8, 'api')).db!;
+    expect(after.utilization).toBeLessThanOrEqual(0.8);
+  });
+
+  it('uma instância dentro do limite seguro não pede réplica', () => {
+    expect(db(1, 50, 0.3).requiredInstances).toBe(1); // 40 × 0,010 = 40%
+  });
+
+  it('sem o campo, assume 20% de escritas', () => {
+    const c = db(2, 100);
+    expect(c.database!.writeFraction).toBe(0.2);
+    expect(c.database!.primary.utilization).toBeCloseTo(0.16, 9);
+    expect(c.database!.replicas!.utilization).toBeCloseTo(0.64, 9);
+  });
+
+  it('só escritas: réplicas ociosas e nenhuma réplica recomendada', () => {
+    const c = db(3, 100, 1);
+    expect(c.database!.replicas!.utilization).toBe(0);
+    expect(c.maxEntryRps).toBeCloseTo(125, 9);
+    expect(c.database!.limitedBy).toBe('primary');
+    expect(db(1, 150, 1).requiredInstances).toBe(1);
+  });
+
+  it('a curva usa o mesmo modelo de duas filas', () => {
+    const engine10 = new SimulationEngine({ curve: { points: 11, maxCapacityFraction: 0.5 } });
+    const r = engine10.run({ graph: withDatabase(2, 0.3), entryPointId: 'api', trafficRps: 0.5 * (1 / 0.0056) * 0.4, safeUtilization: 0.8 });
+    const p = r.curve.find((x) => Math.abs(x.trafficRps - r.input.trafficRps) < 1e-9)!;
+    expect(p.responseTimeMs).toBeCloseTo(r.system.responseTimeMs!, 9);
+    expect(r.curve.at(-1)!.trafficRps).toBeCloseTo(0.5 / 0.0056, 9);
+  });
+});
+
 /** Gerador de grafos acíclicos aleatórios: ligações só de i para j > i, entrada no nó 0. */
 const arbGraph = fc
   .integer({ min: 1, max: 8 })
@@ -219,6 +317,7 @@ const arbGraph = fc
             instances: fc.integer({ min: 1, max: 8 }),
             serviceTimeMs: fc.double({ min: 0.5, max: 200, noNaN: true }),
             monthlyCostPerInstance: fc.integer({ min: 0, max: 2000 }),
+            writeFraction: fc.double({ min: 0, max: 1, noNaN: true }),
           }),
         ),
       ),
@@ -253,8 +352,14 @@ describe('SimulationEngine: propriedades em grafos aleatórios', () => {
         for (const c of r.components) {
           const spec = g.components.find((x) => x.id === c.id)!;
           expect(c.throughputRps).toBeCloseTo(r.input.trafficRps * c.visits, 6);
-          if (spec.type !== 'external') {
-            expect(c.utilization).toBeCloseTo((c.throughputRps * spec.serviceTimeMs) / 1000 / spec.instances, 9);
+          const S = spec.serviceTimeMs / 1000;
+          if (spec.type === 'database' && spec.instances > 1) {
+            const w = spec.writeFraction!;
+            expect(c.database!.primary.utilization).toBeCloseTo(c.throughputRps * w * S, 9);
+            expect(c.database!.replicas!.utilization).toBeCloseTo((c.throughputRps * (1 - w) * S) / (spec.instances - 1), 9);
+            expect(c.utilization).toBe(Math.max(c.database!.primary.utilization, c.database!.replicas!.utilization));
+          } else if (spec.type !== 'external') {
+            expect(c.utilization).toBeCloseTo((c.throughputRps * S) / spec.instances, 9);
           }
         }
       }),
@@ -310,8 +415,13 @@ describe('SimulationEngine: propriedades em grafos aleatórios', () => {
           components: g.components.map((s) => ({ ...s, instances: byId(r)[s.id]!.requiredInstances })),
         };
         const after = run(resized, r.input.trafficRps, thr, 'n0');
-        for (const c of after.components) expect(c.utilization).toBeLessThanOrEqual(thr * (1 + 1e-9));
-        expect(after.system.saturated).toBe(false);
+        // Um primário que não dá conta das escritas não se resolve com instâncias;
+        // o motor sinaliza isso em vez de recomendar réplicas inúteis.
+        for (const c of after.components) {
+          if (c.database?.primaryOverSafe) continue;
+          expect(c.utilization).toBeLessThanOrEqual(thr * (1 + 1e-9));
+        }
+        if (!after.components.some((c) => c.database?.primaryOverSafe)) expect(after.system.saturated).toBe(false);
         expect(after.system.extraMonthlyCost).toBe(0);
       }),
       opts,

@@ -49,6 +49,19 @@ describe('API', () => {
     expect(paths).toContain('trafficRps');
   });
 
+  it('aceita o percentual de escritas do banco e recusa valores fora de [0, 1]', async () => {
+    const withWrites = (writeFraction: unknown) => {
+      const g = ecommerce();
+      g.components = g.components.map((c) => (c.id === 'db' ? { ...c, writeFraction } as typeof c : c));
+      return post('/simulations', { graph: g, entryPointId: 'lb', trafficRps: 100, safeUtilization: 0.8 });
+    };
+    const ok = await withWrites(0.3);
+    expect(ok.status).toBe(200);
+    const body = (await ok.json()) as any; // eslint-disable-line @typescript-eslint/no-explicit-any
+    expect(body.components.find((c: { id: string }) => c.id === 'db').database.writeFraction).toBe(0.3);
+    expect((await withWrites(1.5)).status).toBe(400);
+  });
+
   it('422 com os problemas do diagrama quando o motor rejeita o grafo', async () => {
     const g = ecommerce();
     g.links.push({ source: 'db', target: 'lb', callsPerRequest: 1, async: false });

@@ -8,6 +8,8 @@ export interface ComponentData extends Record<string, unknown> {
   instances: number;
   serviceTimeMs: number;
   monthlyCostPerInstance: number;
+  /** Só para banco de dados: fração das consultas que são escritas. */
+  writeFraction?: number;
 }
 
 export interface LinkData extends Record<string, unknown> {

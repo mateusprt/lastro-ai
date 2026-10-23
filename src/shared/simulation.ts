@@ -42,8 +42,17 @@ export interface ComponentSpec {
   serviceTimeMs: number;
   /** Custo mensal de uma instância, em reais. */
   monthlyCostPerInstance: number;
+  /**
+   * Só para `database`: fração das consultas que alteram dados, em [0, 1].
+   * Com mais de uma instância, as escritas vão todas para o primário e as
+   * leituras se dividem entre as réplicas. Padrão: DEFAULT_WRITE_FRACTION.
+   */
+  writeFraction?: number;
   position?: Position;
 }
+
+/** Fração de escritas assumida para um banco quando o campo não é enviado. */
+export const DEFAULT_WRITE_FRACTION = 0.2;
 
 /** Aresta do diagrama: `source` chama `target`. */
 export interface LinkSpec {
@@ -87,7 +96,10 @@ export interface ComponentResult {
   throughputRps: number;
   /** Demanda de serviço D = visitas × S, em ms por requisição de entrada. */
   serviceDemandMs: number;
-  /** Utilização média por instância. Pode passar de 1 quando saturado. Sempre 0 para `external`. */
+  /**
+   * Utilização média por instância. Pode passar de 1 quando saturado. Sempre 0
+   * para `external`. Num banco com réplicas, é a maior entre primário e réplicas.
+   */
   utilization: number;
   saturated: boolean;
   /** Probabilidade de uma visita esperar em fila (Erlang C). */
@@ -108,6 +120,40 @@ export interface ComponentResult {
   maxEntryRps: number | null;
   /** Tráfego de entrada que leva este componente ao limite seguro. `null` se ilimitado. */
   safeEntryRps: number | null;
+  /** Só para `database`: primário e réplicas separados. */
+  database?: DatabaseResult;
+}
+
+/** Uma das filas de um banco: o primário ou o conjunto de réplicas. */
+export interface DatabaseQueueResult {
+  /** Servidores da fila: 1 no primário, instâncias − 1 nas réplicas. */
+  servers: number;
+  throughputRps: number;
+  utilization: number;
+  saturated: boolean;
+  /** Tempo de resposta por consulta nessa fila, em ms. `null` se saturada. */
+  responseTimeMs: number | null;
+  status: ComponentStatus;
+  maxEntryRps: number | null;
+  safeEntryRps: number | null;
+}
+
+/**
+ * Banco de dados como duas filas. O primário é uma fila M/M/1 que recebe só as
+ * escritas; as réplicas formam uma fila M/M/c que recebe só as leituras. Com uma
+ * instância, ela atende tudo: `primary` é a fila inteira e `replicas` é `null`.
+ */
+export interface DatabaseResult {
+  writeFraction: number;
+  primary: DatabaseQueueResult;
+  replicas: DatabaseQueueResult | null;
+  /** Qual fila limita a capacidade do banco. `null` com uma instância ou sem carga. */
+  limitedBy: 'primary' | 'replicas' | null;
+  /**
+   * Só as escritas já passam do limite seguro de um servidor. Mais réplicas não
+   * resolvem: é preciso um primário maior, menos escritas ou particionar os dados.
+   */
+  primaryOverSafe: boolean;
 }
 
 export interface LinkResult {

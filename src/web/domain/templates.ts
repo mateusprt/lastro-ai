@@ -1,4 +1,4 @@
-import type { ComponentType } from '../../shared/simulation.js';
+import { DEFAULT_WRITE_FRACTION, type ComponentType } from '../../shared/simulation.js';
 import type { DiagramDoc } from '../store/types.js';
 
 export interface Template {
@@ -8,7 +8,7 @@ export interface Template {
   build: () => DiagramDoc;
 }
 
-type N = [id: string, name: string, type: ComponentType, instances: number, serviceTimeMs: number, cost: number, x: number, y: number];
+type N = [id: string, name: string, type: ComponentType, instances: number, serviceTimeMs: number, cost: number, x: number, y: number, writeFraction?: number];
 type L = [source: string, target: string, calls: number, async?: boolean];
 
 function doc(name: string, entry: string, traffic: number, nodes: N[], links: L[]): DiagramDoc {
@@ -17,11 +17,18 @@ function doc(name: string, entry: string, traffic: number, nodes: N[], links: L[
     entryPointId: entry,
     trafficRps: traffic,
     safeUtilization: 0.8,
-    nodes: nodes.map(([id, label, type, instances, serviceTimeMs, monthlyCostPerInstance, x, y]) => ({
+    nodes: nodes.map(([id, label, type, instances, serviceTimeMs, monthlyCostPerInstance, x, y, writeFraction]) => ({
       id,
       type: 'component',
       position: { x, y },
-      data: { name: label, type, instances, serviceTimeMs, monthlyCostPerInstance },
+      data: {
+        name: label,
+        type,
+        instances,
+        serviceTimeMs,
+        monthlyCostPerInstance,
+        ...(type === 'database' ? { writeFraction: writeFraction ?? DEFAULT_WRITE_FRACTION } : {}),
+      },
     })),
     edges: links.map(([source, target, callsPerRequest, async = false]) => ({
       id: `${source}->${target}`,
@@ -50,7 +57,7 @@ export const TEMPLATES: readonly Template[] = [
           ['pay', 'Gateway de pagamento', 'external', 1, 200, 0, 580, 130],
           ['queue', 'Fila de pedidos', 'queue', 1, 0.5, 50, 580, 500],
           ['worker', 'Processador de pedidos', 'worker', 2, 30, 300, 870, 500],
-          ['db', 'Postgres', 'database', 2, 10, 1800, 1160, 300],
+          ['db', 'Postgres', 'database', 2, 10, 1800, 1160, 300, 0.3],
         ],
         [
           ['lb', 'app', 1],

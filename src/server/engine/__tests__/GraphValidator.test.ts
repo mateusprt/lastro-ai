@@ -86,6 +86,15 @@ describe('GraphValidator', () => {
     expect(issues.some((i) => i.code === 'INVALID_LINK_WEIGHT')).toBe(true);
   });
 
+  it('valida o percentual de escritas do banco', () => {
+    const ok = (writeFraction: number) => input({ components: [component('db', 'database', 2, 10, 0, writeFraction)], links: [] });
+    expect(codes(ok(0))).toEqual([]);
+    expect(codes(ok(1))).toEqual([]);
+    expect(codes(ok(-0.1))).toContain('INVALID_WRITE_FRACTION');
+    expect(codes(ok(1.5))).toContain('INVALID_WRITE_FRACTION');
+    expect(codes(ok(NaN))).toContain('INVALID_WRITE_FRACTION');
+  });
+
   it('valida tráfego e limite seguro', () => {
     expect(codes(input(ecommerce(), { trafficRps: -1 }))).toContain('INVALID_TRAFFIC');
     expect(codes(input(ecommerce(), { trafficRps: Number.NaN }))).toContain('INVALID_TRAFFIC');

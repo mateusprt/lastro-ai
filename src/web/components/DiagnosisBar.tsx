@@ -59,7 +59,8 @@ export function DiagnosisBar() {
 
   const d = diagnose(result);
   const Icon = d.tone === 'ok' ? CheckIcon : d.tone === 'warning' ? WarnIcon : CriticalIcon;
-  return (
+  return <></>
+  /* return (
     <div className={`diagnosis tone-${d.tone}`} aria-live="polite">
       <Icon size={20} className="diag-icon" />
       <div className="diag-text">
@@ -68,5 +69,5 @@ export function DiagnosisBar() {
       </div>
       {busy}
     </div>
-  );
+  ); */
 }

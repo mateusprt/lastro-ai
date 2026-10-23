@@ -28,12 +28,16 @@ function LinkEdgeViewImpl(props: EdgeProps<LinkEdge>) {
           style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}
           onClick={() => useEditor.getState().select(id, 'edge')}
         >
-          {flow !== undefined && <span className="edge-flow">{formatNumber(flow)} req/s</span>}
+          {flow !== undefined && (
+            <span className="edge-flow" title="Chamadas por segundo nesta ligação">
+              {formatNumber(flow)} req/s
+            </span>
+          )}
           {(calls !== 1 || isAsync) && (
             <span className="edge-meta">
               {calls !== 1 && `×${formatNumber(calls)}`}
               {calls !== 1 && isAsync && ', '}
-              {isAsync && 'assíncrona'}
+              {isAsync && 'não espera'}
             </span>
           )}
         </div>

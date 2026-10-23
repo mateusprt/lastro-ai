@@ -6,8 +6,9 @@ export function component(
   instances: number,
   serviceTimeMs: number,
   monthlyCostPerInstance = 0,
+  writeFraction?: number,
 ): ComponentSpec {
-  return { id, name: id, type, instances, serviceTimeMs, monthlyCostPerInstance };
+  return { id, name: id, type, instances, serviceTimeMs, monthlyCostPerInstance, ...(writeFraction !== undefined ? { writeFraction } : {}) };
 }
 
 export function link(source: string, target: string, callsPerRequest = 1, async = false): LinkSpec {
@@ -23,7 +24,9 @@ export function link(source: string, target: string, callsPerRequest = 1, async 
  *            ⇢ fila (0,2, assíncrona) → worker → db (2)
  *
  * Demanda por instância (visitas × S / c):
- *   lb 0,001 · app 0,005 · cache 0,001 · db 0,004 · fila 0,0001 · worker 0,003
+ *   lb 0,001 · app 0,005 · cache 0,001 · fila 0,0001 · worker 0,003
+ *   db (3 instâncias, 20% de escritas por padrão, 0,8 visita):
+ *     primário 0,8 × 0,2 × 0,010 = 0,0016 · réplicas 0,8 × 0,8 × 0,010 / 2 = 0,0032
  * Gargalo: app. Capacidade máxima: 1 / 0,005 = 200 req/s. Segura (80%): 160 req/s.
  */
 export function ecommerce(): ArchitectureGraph {
@@ -32,7 +35,7 @@ export function ecommerce(): ArchitectureGraph {
       component('lb', 'load_balancer', 1, 1, 100),
       component('app', 'app', 4, 20, 450),
       component('cache', 'cache', 1, 1, 350),
-      component('db', 'database', 2, 10, 1800),
+      component('db', 'database', 3, 10, 1800),
       component('pay', 'external', 1, 200, 0),
       component('queue', 'queue', 1, 0.5, 50),
       component('worker', 'worker', 2, 30, 300),

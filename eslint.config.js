@@ -33,11 +33,6 @@ export default tseslint.config(
     },
   },
   {
-    // Testes não entram no bundle: podem usar o motor para gerar resultados reais.
-    files: ['src/web/**/__tests__/**'],
-    rules: { 'no-restricted-imports': 'off' },
-  },
-  {
     rules: {
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
     },

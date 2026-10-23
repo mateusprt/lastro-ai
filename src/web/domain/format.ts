@@ -36,6 +36,29 @@ export function formatPercent(fraction: number): string {
   return `${nf(0, 0).format(fraction * 100)}%`;
 }
 
+/** Quantidade grande por extenso curto: 950 · 360 mil · 8,6 milhões · 1,2 bilhão */
+export function formatCount(n: number): string {
+  const units: [number, string, string][] = [
+    [1e9, 'bilhão', 'bilhões'],
+    [1e6, 'milhão', 'milhões'],
+    [1e3, 'mil', 'mil'],
+  ];
+  for (const [size, one, many] of units) {
+    if (n >= size) {
+      const v = n / size;
+      const text = v < 10 ? nf(0, 1).format(v) : nf(0, 0).format(v);
+      return `${text} ${text === '1' ? one : many}`;
+    }
+  }
+  return nf(0, 0).format(n);
+}
+
+/** Tráfego por segundo traduzido para hora e dia: "≈ 360 mil por hora · 8,6 milhões por dia". */
+export function formatVolume(rps: number): string {
+  if (!(rps > 0)) return 'Nenhum acesso';
+  return `≈ ${formatCount(rps * 3600)} por hora · ${formatCount(rps * 86400)} por dia`;
+}
+
 export function formatMultiplier(x: number): string {
   return `${nf(0, 1).format(x)}×`;
 }

@@ -2,9 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import { emptyDoc, TEMPLATES } from '../domain/templates.js';
 import type { DraftStatus } from '../hooks/useDraftPersistence.js';
 import { useLoadDoc } from '../hooks/useLoadDoc.js';
-import { useEditor } from '../store/editor.js';
+import { snapshot, useEditor } from '../store/editor.js';
 import { useUi } from '../store/ui.js';
-import { ChevronIcon, HelpIcon, LoadLineMark, RedoIcon, UndoIcon } from './icons.js';
+import { saveDraft } from '../store/draft.js';
+import { useSimulation } from '../store/simulation.js';
+import { ChevronIcon, HelpIcon, RedoIcon, ReportIcon, UndoIcon } from './icons.js';
 
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 const MOD = isMac ? '⌘' : 'Ctrl';
@@ -16,11 +18,11 @@ export function Header({ draft }: { draft: DraftStatus }) {
   const canRedo = useEditor((s) => s.history.future.length > 0);
   const openPro = useUi((s) => s.openPro);
   const openHelp = useUi((s) => s.openHelp);
+  const hasResult = useSimulation((s) => s.result !== null);
 
   return (
     <header className="topbar">
       <div className="brand">
-        <LoadLineMark />
         <span className="brand-name">Lastro</span>
       </div>
 
@@ -40,6 +42,21 @@ export function Header({ draft }: { draft: DraftStatus }) {
       </div>
 
       <div className="topbar-group topbar-end">
+        {/* TESTE: aberto a todos enquanto o app não está no ar; depois vira recurso do Plano Pro. */}
+        <button
+          type="button"
+          className="btn"
+          onClick={openExecutiveReport}
+          disabled={!hasResult}
+          title={
+            hasResult
+              ? 'Abre numa nova aba: gargalo, data de saturação, cenários, recomendação e custo'
+              : 'Monte um diagrama com ponto de entrada para gerar o relatório'
+          }
+        >
+          <ReportIcon size={18} />
+          Relatório executivo
+        </button>
         <button type="button" className="btn btn-quiet" onClick={openHelp}>
           <HelpIcon size={18} />
           Como funciona
@@ -53,6 +70,15 @@ export function Header({ draft }: { draft: DraftStatus }) {
       </div>
     </header>
   );
+}
+
+/**
+ * Grava o diagrama agora (sem esperar o rascunho automático) e abre o relatório
+ * em outra aba, que lê o mesmo rascunho.
+ */
+function openExecutiveReport() {
+  saveDraft(snapshot(useEditor.getState()));
+  window.open('/relatorio.html', '_blank', 'noopener');
 }
 
 function TemplatesMenu() {

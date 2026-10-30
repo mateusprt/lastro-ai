@@ -17,7 +17,6 @@ const INTRO: Record<string, string> = {
   header: 'O Plano Pro é para quem leva o resultado e planeja com frequência.',
   cost: 'O custo da arquitetura e de cada cenário faz parte do Plano Pro.',
   scenarios: 'Salvar e comparar cenários, como "Black Friday 3×", faz parte do Plano Pro.',
-  report: 'O relatório para compartilhar com o gestor faz parte do Plano Pro.',
 };
 
 /** Diálogo "Plano Pro em breve": inscreve na lista de espera e registra o recurso que motivou o clique. */
@@ -60,7 +59,6 @@ export function ProDialog() {
       <ul className="pro-list">
         <li>Diagramas maiores e ilimitados</li>
         <li>Cenários comparados lado a lado</li>
-        <li>Relatório para compartilhar</li>
         <li>Custo atual e custo extra de cada cenário</li>
       </ul>
       {state === 'done' ? (

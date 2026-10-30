@@ -20,6 +20,8 @@ import { FIT_VIEW } from '../../domain/viewport.js';
 
 const nodeTypes = { component: ComponentNodeView };
 const edgeTypes = { link: LinkEdgeView };
+/** Sem a marca "React Flow" no canto do diagrama (permitido pela licença MIT). */
+const PRO_OPTIONS = { hideAttribution: true } as const;
 const defaultEdgeOptions = { type: 'link', markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16 } } as const;
 
 export function Canvas({ children }: { children?: React.ReactNode }) {
@@ -71,6 +73,7 @@ export function Canvas({ children }: { children?: React.ReactNode }) {
         maxZoom={2}
         snapToGrid
         snapGrid={[10, 10]}
+        proOptions={PRO_OPTIONS}
       >
         <Background variant={BackgroundVariant.Dots} gap={20} size={1.2} />
         <Controls showInteractive={false} position="bottom-right" />

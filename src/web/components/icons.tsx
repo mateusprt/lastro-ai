@@ -73,15 +73,6 @@ export function TypeIcon({ type, ...p }: IconProps & { type: ComponentType }) {
 }
 
 /** Marca da Lastro: o disco de Plimsoll, a linha de carga pintada no casco dos navios. */
-export function LoadLineMark({ size = 22, className }: IconProps) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true" className={className}>
-      <circle cx="12" cy="12" r="7" stroke="currentColor" strokeWidth="2" />
-      <path d="M1.5 12h21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-    </svg>
-  );
-}
-
 export const UndoIcon = (p: IconProps) => (
   <Svg {...p}>
     <path d="M7.5 5 4 8.5 7.5 12M4 8.5h8a4 4 0 0 1 0 8H9" />
@@ -133,6 +124,12 @@ export const ChevronIcon = (p: IconProps) => (
 export const CloseIcon = (p: IconProps) => (
   <Svg {...p}>
     <path d="m5 5 10 10M15 5 5 15" />
+  </Svg>
+);
+export const ReportIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M5 2.5h7l3 3v12H5z" />
+    <path d="M12 2.5v3h3M7.5 10h5M7.5 13h5M7.5 7h2" />
   </Svg>
 );
 export const HelpIcon = (p: IconProps) => (

@@ -32,6 +32,8 @@ src/
     controllers/  services/  middlewares/  validation/  http/
   web/                       frontend React + Vite
     index.html, main.tsx, App.tsx
+    relatorio.html, report-main.tsx   relatório executivo (segunda página, em outra aba)
+    report/                  tela do relatório executivo
     http/                    cliente da API (cookies httpOnly, renovação em 401)
     store/                   estado do editor (zustand, desfazer/refazer) e da simulação
     domain/                  catálogo de componentes, modelos, formatação, diagnóstico
@@ -49,6 +51,7 @@ src/
 - **Simulação automática**: cada edição chama `POST /api/simulations` com debounce de 300 ms e cancela a requisição anterior. Mover nós não dispara simulação. O último resultado continua visível, esmaecido, enquanto o novo é calculado ou se der erro.
 - **Feedback no diagrama**: cada nó mostra a utilização num medidor com a linha de carga (o limite seguro) e o status com ícone e texto. As ligações mostram a vazão.
 - **Painéis**: diagnóstico em linguagem simples sobre o canvas; abas "Simulação" (tráfego, limite seguro, capacidade, tempo de resposta, gargalo) e "Propriedades" (alternam conforme a seleção); tabela de componentes e curva de resposta com crosshair e visão em tabela.
+- **Relatório executivo** (aberto durante os testes; depois vira recurso do Plano Pro): o botão no topo abre `relatorio.html` em outra aba. A página lê o diagrama gravado no navegador, simula na API os cenários hoje, 6 e 12 meses (pelo crescimento mensal informado na própria página, 5% por padrão), pico de 3× e "12 meses com o reforço", e mostra gargalo, data de saturação, recomendação e custo. Acompanha as edições feitas no editor e exporta para PDF pela impressão do navegador.
 - **Plano Pro**: o custo aparece bloqueado com o selo "Pro"; "Cenários" e "Plano Pro em breve" abrem o diálogo da lista de espera, que registra o recurso que motivou o clique.
 - **Atalhos**: Ctrl/⌘+Z desfaz, Ctrl/⌘+Shift+Z ou Ctrl+Y refaz, Delete exclui a seleção, Esc limpa a seleção.
 - **Rascunho**: provisoriamente guardado no `localStorage` até existir o salvamento na API.

@@ -4,7 +4,7 @@ import '@fontsource-variable/hanken-grotesk';
 import '@xyflow/react/dist/style.css';
 import './styles/app.css';
 import { App } from './App.js';
-import { loadDraft } from './hooks/useDraftPersistence.js';
+import { loadDraft } from './store/draft.js';
 import { useEditor } from './store/editor.js';
 
 const draft = loadDraft();

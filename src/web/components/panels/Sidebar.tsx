@@ -32,14 +32,17 @@ export function Sidebar() {
 
   return (
     <aside className="sidebar">
-      <div className="tabs" role="tablist" aria-label="Painel lateral">
-        <button type="button" role="tab" id="tab-sim" aria-selected={tab === 'simulation'} aria-controls="panel-sim" className="tab" onClick={() => setTab('simulation')}>
-          Simulação
-        </button>
-        <button type="button" role="tab" id="tab-props" aria-selected={tab === 'properties'} aria-controls="panel-props" className="tab" onClick={() => setTab('properties')}>
-          {label}
-        </button>
+      <div className="tabs">
+        {/* Na borda voltada para o diagrama, como na barra da esquerda. Fica fora da lista de abas. */}
         <CollapseButton label="Painel lateral" side="right" onClick={toggle} />
+        <div className="tab-list" role="tablist" aria-label="Painel lateral">
+          <button type="button" role="tab" id="tab-sim" aria-selected={tab === 'simulation'} aria-controls="panel-sim" className="tab" onClick={() => setTab('simulation')}>
+            Simulação
+          </button>
+          <button type="button" role="tab" id="tab-props" aria-selected={tab === 'properties'} aria-controls="panel-props" className="tab" onClick={() => setTab('properties')}>
+            {label}
+          </button>
+        </div>
       </div>
       <div role="tabpanel" id="panel-sim" aria-labelledby="tab-sim" hidden={tab !== 'simulation'}>
         <SimulationPanel />

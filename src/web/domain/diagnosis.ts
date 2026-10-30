@@ -58,13 +58,13 @@ export function diagnose(result: SimulationResult): Diagnosis {
   const headroom = system.safeCapacityRps !== null && input.trafficRps > 0 ? system.safeCapacityRps / input.trafficRps : null;
   const capacity =
     headroom === null
-      ? `Dentro do limite seguro de ${limit}, a arquitetura aguenta até ${formatRps(system.safeCapacityRps)}.`
-      : `Dentro do limite seguro de ${limit}, a arquitetura aguenta até ${formatRps(system.safeCapacityRps)}, ${formatMultiplier(headroom)} o tráfego atual.`;
+      ? `Sem passar de ${limit} de ocupação, a arquitetura aguenta até ${formatRps(system.safeCapacityRps)}.`
+      : `Sem passar de ${limit} de ocupação, a arquitetura aguenta até ${formatRps(system.safeCapacityRps)}, ${formatMultiplier(headroom)} os acessos de agora.`;
 
   if (b.status === 'critical' && b.database?.primaryOverSafe) {
     return {
       tone: 'critical',
-      headline: `O primário de ${name} está acima do limite seguro, a ${formatPercent(b.database.primary.utilization)} de utilização.`,
+      headline: `O primário de ${name} está acima da ocupação aceitável, a ${formatPercent(b.database.primary.utilization)} de ocupação.`,
       detail: `Todas as escritas vão para ele, então mais réplicas não resolvem. Para voltar para baixo de ${limit}, ${PRIMARY_WAYS_OUT}.`,
     };
   }
@@ -72,7 +72,7 @@ export function diagnose(result: SimulationResult): Diagnosis {
   if (b.status === 'critical') {
     return {
       tone: 'critical',
-      headline: `${name} está acima do limite seguro, a ${formatPercent(b.utilization)} de utilização.`,
+      headline: `${name} está acima da ocupação aceitável, a ${formatPercent(b.utilization)} de ocupação.`,
       detail: `O tempo de resposta já é de ${formatMs(system.responseTimeMs)}. Com ${b.requiredInstances} instâncias, ${name} volta para baixo de ${limit}.`,
     };
   }
@@ -82,13 +82,13 @@ export function diagnose(result: SimulationResult): Diagnosis {
   if (limitedBy === 'primary') {
     return {
       tone,
-      headline: `O gargalo é o primário de ${name}, a ${formatPercent(b.database!.primary.utilization)} de utilização.`,
+      headline: `O gargalo é o primário de ${name}, a ${formatPercent(b.database!.primary.utilization)} de ocupação.`,
       detail: `${capacity} Mais réplicas não aumentam esse limite, porque todas as escritas vão para o primário.`,
     };
   }
   return {
     tone,
-    headline: `${bottleneckLabel(b, limitedBy)}, a ${formatPercent(b.utilization)} de utilização.`,
+    headline: `${bottleneckLabel(b, limitedBy)}, a ${formatPercent(b.utilization)} de ocupação.`,
     detail: capacity,
   };
 }

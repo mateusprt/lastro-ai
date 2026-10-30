@@ -1,4 +1,4 @@
-import { useLayoutEffect, useState, type PointerEvent } from 'react';
+import { useId, useLayoutEffect, useState, type PointerEvent } from 'react';
 import { formatMs, formatNumber, formatRps } from '../../domain/format.js';
 import { useSimulation } from '../../store/simulation.js';
 
@@ -27,6 +27,8 @@ export function ResponseCurve() {
   const [width, setWidth] = useState(560);
   const [hover, setHover] = useState<number | null>(null);
   const [asTable, setAsTable] = useState(false);
+  // O relatório desenha uma segunda curva na mesma página: o recorte precisa de id único.
+  const clipId = `plot-clip-${useId().replace(/:/g, '')}`;
 
   // Ref por callback: o contêiner só existe quando há resultado e o gráfico está visível.
   useLayoutEffect(() => {
@@ -112,7 +114,7 @@ export function ResponseCurve() {
         <div className="chart" ref={setChartEl}>
           <svg width={width} height={H} role="img" aria-label="Tempo de resposta conforme o tráfego de entrada aumenta">
             <defs>
-              <clipPath id="plot-clip">
+              <clipPath id={clipId}>
                 <rect x={M.left} y={M.top - 2} width={iw} height={ih + 2} />
               </clipPath>
             </defs>
@@ -145,7 +147,7 @@ export function ResponseCurve() {
               </g>
             )}
 
-            <path d={path} className="curve-line" clipPath="url(#plot-clip)" />
+            <path d={path} className="curve-line" clipPath={`url(#${clipId})`} />
 
             {currentInRange && (
               <g>

@@ -6,7 +6,7 @@ export function simulate(input: SimulationInput, signal?: AbortSignal): Promise<
 }
 
 /** Recurso ou limite que levou o usuário ao Plano Pro. Medimos qual motiva mais. */
-export type ProFeature = 'header' | 'cost' | 'scenarios' | 'report';
+export type ProFeature = 'header' | 'cost' | 'scenarios';
 
 export function joinProWaitlist(feature: ProFeature): Promise<{ subscribed: boolean }> {
   return request('/waitlist/pro', { method: 'POST', body: { feature } });

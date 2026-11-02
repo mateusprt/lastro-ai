@@ -19,7 +19,10 @@ export function ComponentTable() {
 
   const rows = [...result.components].sort((a, b) => {
     if (a.reachable !== b.reachable) return a.reachable ? -1 : 1;
-    if ((a.type === 'external') !== (b.type === 'external')) return a.type === 'external' ? 1 : -1;
+    // Externos sem limite de chamadas não têm ocupação: vão para o fim.
+    const aFree = a.maxEntryRps === null;
+    const bFree = b.maxEntryRps === null;
+    if (aFree !== bFree) return aFree ? 1 : -1;
     return b.utilization - a.utilization;
   });
 
@@ -45,6 +48,7 @@ export function ComponentTable() {
         <tbody>
           {rows.map((c) => {
             const external = c.type === 'external';
+            const measured = c.reachable && (!external || c.rateLimit !== undefined);
             return (
               <tr
                 key={c.id}
@@ -61,8 +65,8 @@ export function ComponentTable() {
                   </button>
                 </th>
                 <td className="num">{c.reachable ? formatRps(c.throughputRps) : 'Nenhum acesso'}</td>
-                <td>{c.reachable && !external ? <LoadGauge compact utilization={c.utilization} safeUtilization={safe} status={c.status} saturated={c.saturated} /> : <span className="muted">Sem fila</span>}</td>
-                <td>{c.reachable && !external ? <StatusTag status={c.status} saturated={c.saturated} /> : null}</td>
+                <td>{measured ? <LoadGauge compact utilization={c.utilization} safeUtilization={safe} status={c.status} saturated={c.saturated} /> : <span className="muted">Sem fila</span>}</td>
+                <td>{measured ? <StatusTag status={c.status} saturated={c.saturated} /> : null}</td>
                 <td className="num">{!c.reachable ? '' : c.saturated ? 'Sobrecarregado' : formatMs(c.responseTimeMs)}</td>
                 <td className="num">
                   {external ? '' : c.additionalInstances > 0 ? (

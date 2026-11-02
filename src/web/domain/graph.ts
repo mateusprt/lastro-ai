@@ -1,9 +1,11 @@
 import type { SimulationInput } from '../../shared/simulation.js';
 import type { DiagramDoc, LinkEdge } from '../store/types.js';
+import { advancedSpec } from './advanced.js';
 
 /**
  * Monta o corpo de POST /simulations a partir do documento. As posições ficam
  * de fora: não mudam o resultado, e assim arrastar um nó não dispara simulação.
+ * Os campos da modelagem avançada só vão quando ela está ligada no diagrama.
  */
 export function toSimulationInput(doc: DiagramDoc): SimulationInput | null {
   if (doc.nodes.length === 0 || doc.entryPointId === null) return null;
@@ -17,6 +19,7 @@ export function toSimulationInput(doc: DiagramDoc): SimulationInput | null {
         serviceTimeMs: n.data.serviceTimeMs,
         monthlyCostPerInstance: n.data.monthlyCostPerInstance,
         ...(n.data.type === 'database' && n.data.writeFraction !== undefined ? { writeFraction: n.data.writeFraction } : {}),
+        ...(doc.advancedModeling === true ? advancedSpec(n.data) : {}),
       })),
       links: doc.edges.map((e) => ({
         id: e.id,

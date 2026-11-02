@@ -51,6 +51,7 @@ src/
 - **Simulação automática**: cada edição chama `POST /api/simulations` com debounce de 300 ms e cancela a requisição anterior. Mover nós não dispara simulação. O último resultado continua visível, esmaecido, enquanto o novo é calculado ou se der erro.
 - **Feedback no diagrama**: cada nó mostra a utilização num medidor com a linha de carga (o limite seguro) e o status com ícone e texto. As ligações mostram a vazão.
 - **Painéis**: diagnóstico em linguagem simples sobre o canvas; abas "Simulação" (tráfego, limite seguro, capacidade, tempo de resposta, gargalo) e "Propriedades" (alternam conforme a seleção); tabela de componentes e curva de resposta com crosshair e visão em tabela.
+- **Modelagem avançada**: o botão "Modelagem avançada" no topo liga, por diagrama, autoscaling (aplicação e worker), taxa de acerto do cache, pool de conexões do banco e limite de chamadas de serviços de terceiros. Os campos aparecem nas propriedades de cada componente; desligada, nenhum campo avançado vai para a API e o cálculo é o básico.
 - **Relatório executivo** (aberto durante os testes; depois vira recurso do Plano Pro): o botão no topo abre `relatorio.html` em outra aba. A página lê o diagrama gravado no navegador, simula na API os cenários hoje, 6 e 12 meses (pelo crescimento mensal informado na própria página, 5% por padrão), pico de 3× e "12 meses com o reforço", e mostra gargalo, data de saturação, recomendação e custo. Acompanha as edições feitas no editor e exporta para PDF pela impressão do navegador.
 - **Plano Pro**: o custo aparece bloqueado com o selo "Pro"; "Cenários" e "Plano Pro em breve" abrem o diálogo da lista de espera, que registra o recurso que motivou o clique.
 - **Atalhos**: Ctrl/⌘+Z desfaz, Ctrl/⌘+Shift+Z ou Ctrl+Y refaz, Delete exclui a seleção, Esc limpa a seleção.
@@ -71,6 +72,10 @@ O frontend nunca importa `src/server`: a regra `no-restricted-imports` do ESLint
 | Capacidade máxima | `min(c / (visitas × S))` entre os componentes com fila |
 | Capacidade segura | capacidade máxima × limite seguro |
 | Instâncias necessárias | `max(c, ⌈a / limite seguro⌉)` |
+| Autoscaling (avançado) | Instâncias ativas `c = ⌈a / alvo⌉`, entre o mínimo e o máximo. Capacidade com o máximo; custo com as ativas. |
+| Cache com taxa de acerto (avançado) | As ligações que saem do cache levam `visitas × (1 − acerto)`. |
+| Pool de conexões (avançado) | Cada consulta prende uma conexão por `H = R do banco + tempo extra`. Conexões em uso `X × H` (Little); espera por conexão numa fila M/M/P. Capacidade do pool por bisseção, porque H cresce com a carga. |
+| Limite de terceiros (avançado) | Ocupação `chamadas / limite`; a partir de 100% o fornecedor recusa e o serviço conta como sobrecarregado. Pode ser o gargalo. |
 | Status | crítico a partir do limite seguro; atenção a partir de 75% dele |
 
 Serviços externos são latência fixa: não têm fila, não entram no gargalo nem nas capacidades. Tempos e capacidades `null` significam "ilimitado". Erlang C é calculado pela recorrência de Erlang B, estável com milhares de instâncias. Um diagrama de 50 componentes roda em cerca de 2 ms (p95).

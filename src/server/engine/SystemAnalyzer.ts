@@ -4,9 +4,9 @@ import type { ComponentResult, SystemResult } from './types.js';
 /**
  * Consolida os resultados por componente em resultados do sistema.
  *
- * - Gargalo: componente com maior demanda por instância (visitas × S / c),
- *   ou seja, o primeiro a saturar quando o tráfego cresce. Definido mesmo com
- *   tráfego zero.
+ * - Gargalo: componente com menor tráfego de entrada até 100%, ou seja, o
+ *   primeiro a saturar quando o tráfego cresce. Entram os componentes com fila
+ *   e os serviços externos com limite de chamadas. Definido mesmo com tráfego zero.
  * - Capacidade máxima: menor tráfego de entrada que leva algum componente a 100%.
  * - Capacidade segura: o mesmo, até o limite seguro.
  * - Tempo de resposta de ponta a ponta: Σ visitas síncronas × R por visita.
@@ -21,19 +21,19 @@ export class SystemAnalyzer {
     entryRps: number,
   ): SystemResult {
     const byId = new Map(components.map((c) => [c.id, c]));
-    const queued = components.filter((c) => c.reachable && c.type !== 'external');
 
     // Gargalo e capacidades
     let bottleneck: ComponentResult | null = null;
     for (const id of propagation.order) {
       const c = byId.get(id)!;
-      if (!c.reachable || c.type === 'external' || c.maxEntryRps === null) continue;
+      if (!c.reachable || c.maxEntryRps === null) continue;
       if (bottleneck === null || c.maxEntryRps < bottleneck.maxEntryRps!) bottleneck = c;
     }
     const maxCapacityRps = bottleneck?.maxEntryRps ?? null;
     const safeCapacityRps = bottleneck?.safeEntryRps ?? null;
 
-    const saturated = queued.some((c) => c.saturated);
+    // Externos sem limite nunca saturam, então dá para olhar todos os alcançáveis.
+    const saturated = components.some((c) => c.reachable && c.saturated);
 
     // Tempo de resposta síncrono (ms)
     let responseTimeMs: number | null = 0;

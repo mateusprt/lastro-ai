@@ -20,13 +20,20 @@ export interface TrafficPropagation {
  *
  * Uma ligação assíncrona gera carga no destino e em tudo o que vem depois dele,
  * mas nada abaixo dela entra no caminho síncrono da requisição de entrada.
+ *
+ * Num cache com taxa de acerto h, só as faltas seguem pelas ligações de saída:
+ * as chamadas por requisição dessas ligações valem × (1 − h).
  */
 export class TrafficPropagator {
   readonly order: string[];
   private readonly outgoing: Map<string, LinkSpec[]>;
+  private readonly pass: Map<string, number>;
 
   constructor(graph: ArchitectureGraph) {
     this.outgoing = new Map(graph.components.map((c) => [c.id, [] as LinkSpec[]]));
+    this.pass = new Map(
+      graph.components.filter((c) => c.type === 'cache' && c.hitRate !== undefined).map((c) => [c.id, 1 - c.hitRate!]),
+    );
     for (const l of graph.links) this.outgoing.get(l.source)?.push(l);
     this.order = topologicalOrder(
       graph.components.map((c) => c.id),
@@ -37,6 +44,11 @@ export class TrafficPropagator {
   /** Ligações que saem de um componente. */
   linksFrom(id: string): readonly LinkSpec[] {
     return this.outgoing.get(id) ?? [];
+  }
+
+  /** Fração das requisições que seguem pelas ligações de saída: 1 − acerto num cache, 1 nos demais. */
+  passThrough(id: string): number {
+    return this.pass.get(id) ?? 1;
   }
 
   /**
@@ -53,8 +65,9 @@ export class TrafficPropagator {
 
     for (const id of this.order) {
       if (!reachable.has(id)) continue;
-      const v = visits.get(id)!;
-      const sv = syncVisits.get(id)!;
+      const pass = this.passThrough(id);
+      const v = visits.get(id)! * pass;
+      const sv = syncVisits.get(id)! * pass;
       for (const l of this.linksFrom(id)) {
         reachable.add(l.target);
         visits.set(l.target, visits.get(l.target)! + v * l.callsPerRequest);

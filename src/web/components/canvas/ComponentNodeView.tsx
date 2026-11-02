@@ -1,11 +1,12 @@
-import { memo } from 'react';
+import { Fragment, memo } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
+import { autoscalingMax, canAutoscale, hitRate, poolSize, rateLimitRps } from '../../domain/advanced.js';
 import { kindOf } from '../../domain/catalog.js';
 import { formatMs, formatNumber, formatPercent } from '../../domain/format.js';
-import { DEFAULT_WRITE_FRACTION } from '../../../shared/simulation.js';
+import { DEFAULT_WRITE_FRACTION, type ComponentStatus } from '../../../shared/simulation.js';
 import { useEditor } from '../../store/editor.js';
 import { useSimulation } from '../../store/simulation.js';
-import type { ComponentNode } from '../../store/types.js';
+import type { ComponentData, ComponentNode } from '../../store/types.js';
 import { EntryIcon, TypeIcon } from '../icons.js';
 import { LoadGauge, StatusTag } from '../Status.js';
 
@@ -18,22 +19,48 @@ function ComponentNodeViewImpl({ id, data, selected }: NodeProps<ComponentNode>)
   const kind = kindOf(data.type);
   const external = data.type === 'external';
   const database = data.type === 'database';
+  const advanced = useEditor((s) => s.advancedModeling);
 
-  const spec = external
-    ? `Latência fixa de ${formatMs(data.serviceTimeMs)}`
-    : database
-      ? `${dbInstances(data.instances)}, ${formatMs(data.serviceTimeMs)} por consulta, ${formatPercent(data.writeFraction ?? DEFAULT_WRITE_FRACTION)} escritas`
-      : `${data.instances} ${data.instances === 1 ? 'instância' : 'instâncias'}, ${formatMs(data.serviceTimeMs)} por requisição`;
-
+  const spec = specLine(data, advanced);
   const unreachable = result && !result.reachable;
   const db = result?.database;
-  const need = db?.primaryOverSafe
-    ? 'Primário no limite'
-    : result && result.additionalInstances > 0
-      ? database
-        ? `+${result.additionalInstances} ${result.additionalInstances === 1 ? 'réplica' : 'réplicas'}`
-        : `+${result.additionalInstances} ${result.additionalInstances === 1 ? 'instância' : 'instâncias'}`
-      : null;
+  const pool = result?.connectionPool;
+  const need = !result
+    ? null
+    : db?.primaryOverSafe
+      ? 'Primário no limite'
+      : pool && pool.status === 'critical' && pool.requiredSize !== null && pool.requiredSize > pool.size
+        ? `Pool: ${pool.requiredSize} conexões`
+        : result.rateLimit && result.status === 'critical'
+          ? 'Limite do fornecedor'
+          : result.autoscaling && result.additionalInstances > 0
+            ? result.autoscaling.atMax
+              ? `Máximo: ${result.autoscaling.requiredMaxInstances}`
+              : 'Alvo acima do limite'
+            : result.additionalInstances > 0
+              ? database
+                ? `+${result.additionalInstances} ${result.additionalInstances === 1 ? 'réplica' : 'réplicas'}`
+                : `+${result.additionalInstances} ${result.additionalInstances === 1 ? 'instância' : 'instâncias'}`
+              : null;
+
+  // Um medidor por fila que pode limitar o componente: primário e réplicas, banco e pool.
+  const gauges: { label: string; title: string; utilization: number; status: ComponentStatus; saturated: boolean }[] = [];
+  if (db?.replicas) {
+    gauges.push({ label: 'Primário', title: 'Recebe todas as gravações', ...db.primary });
+    gauges.push({ label: 'Réplicas', title: 'Dividem as leituras', ...db.replicas });
+  } else if (db && pool) {
+    gauges.push({ label: 'Banco', title: 'Ocupação da instância', ...db.primary });
+  }
+  if (pool) {
+    gauges.push({
+      label: 'Conexões',
+      title: 'Conexões em uso no pool',
+      utilization: pool.utilization ?? 1,
+      status: pool.status,
+      saturated: pool.saturated,
+    });
+  }
+  const limited = external && result?.rateLimit !== undefined;
 
   return (
     <div
@@ -42,7 +69,7 @@ function ComponentNodeViewImpl({ id, data, selected }: NodeProps<ComponentNode>)
         selected ? 'is-selected' : '',
         hasIssue ? 'has-issue' : '',
         unreachable ? 'is-unreachable' : '',
-        result && !external && result.reachable ? `tone-${result.status}` : '',
+        result && (!external || limited) && result.reachable ? `tone-${result.status}` : '',
       ].join(' ')}
     >
       {isEntry && (
@@ -68,35 +95,60 @@ function ComponentNodeViewImpl({ id, data, selected }: NodeProps<ComponentNode>)
           <span className="node-muted">Aguardando simulação</span>
         ) : unreachable ? (
           <span className="node-muted">Nenhum acesso chega aqui. Ligue-o a partir de um componente que recebe acessos.</span>
-        ) : external ? (
+        ) : external && !limited ? (
           <span className="node-muted">{formatNumber(result.throughputRps)} chamadas por segundo. Serviço externo, sem fila.</span>
         ) : (
           <>
-            {db?.replicas ? (
+            {gauges.length >= 2 ? (
               <div className="node-gauges">
-                <span className="node-gauge-label" title="Recebe todas as gravações">
-                  Primário
-                </span>
-                <LoadGauge compact label="Utilização do primário" utilization={db.primary.utilization} safeUtilization={safe} status={db.primary.status} saturated={db.primary.saturated} />
-                <span className="node-gauge-label" title="Dividem as leituras">
-                  Réplicas
-                </span>
-                <LoadGauge compact label="Utilização das réplicas" utilization={db.replicas.utilization} safeUtilization={safe} status={db.replicas.status} saturated={db.replicas.saturated} />
+                {gauges.map((g) => (
+                  <Fragment key={g.label}>
+                    <span className="node-gauge-label" title={g.title}>
+                      {g.label}
+                    </span>
+                    <LoadGauge compact label={`Ocupação: ${g.label.toLowerCase()}`} utilization={g.utilization} safeUtilization={safe} status={g.status} saturated={g.saturated} />
+                  </Fragment>
+                ))}
               </div>
             ) : (
-              <LoadGauge utilization={result.utilization} safeUtilization={safe} status={result.status} saturated={result.saturated} />
+              <LoadGauge
+                {...(limited ? { label: 'Uso do limite do fornecedor' } : {})}
+                utilization={result.utilization}
+                safeUtilization={safe}
+                status={result.status}
+                saturated={result.saturated}
+              />
             )}
             <div className="node-foot">
               <StatusTag status={result.status} saturated={result.saturated} />
               {need && <span className="node-need">{need}</span>}
             </div>
-            {db?.replicas && <span className="node-caveat">Otimista: sem locks, conexões e atraso de réplica</span>}
+            {db?.replicas && <span className="node-caveat">{pool ? 'Otimista: sem locks e atraso de réplica' : 'Otimista: sem locks, conexões e atraso de réplica'}</span>}
           </>
         )}
       </div>
       <Handle type="source" position={Position.Right} className="handle" />
     </div>
   );
+}
+
+/** Linha de especificação do nó, com os recursos avançados ligados. */
+function specLine(d: ComponentData, advanced: boolean): string {
+  const ms = formatMs(d.serviceTimeMs);
+  if (d.type === 'external') {
+    const limit = advanced && d.rateLimitEnabled ? `, até ${formatNumber(rateLimitRps(d))} chamadas/s` : '';
+    return `Latência fixa de ${ms}${limit}`;
+  }
+  if (d.type === 'database') {
+    const pool = advanced && d.poolEnabled ? `, pool de ${poolSize(d)}` : '';
+    return `${dbInstances(d.instances)}, ${ms} por consulta, ${formatPercent(d.writeFraction ?? DEFAULT_WRITE_FRACTION)} escritas${pool}`;
+  }
+  const count =
+    advanced && canAutoscale(d) && d.autoscalingEnabled
+      ? `${d.instances} a ${autoscalingMax(d)} instâncias (autoscaling)`
+      : `${d.instances} ${d.instances === 1 ? 'instância' : 'instâncias'}`;
+  const hit = advanced && d.type === 'cache' ? `, ${formatPercent(hitRate(d))} de acerto` : '';
+  return `${count}, ${ms} por requisição${hit}`;
 }
 
 /** "1 instância" ou "1 primário + 2 réplicas". */

@@ -19,6 +19,8 @@ export function Header({ draft }: { draft: DraftStatus }) {
   const openPro = useUi((s) => s.openPro);
   const openHelp = useUi((s) => s.openHelp);
   const hasResult = useSimulation((s) => s.result !== null);
+  const advanced = useEditor((s) => s.advancedModeling);
+  const setAdvanced = useEditor((s) => s.setAdvancedModeling);
 
   return (
     <header className="topbar">
@@ -42,6 +44,20 @@ export function Header({ draft }: { draft: DraftStatus }) {
       </div>
 
       <div className="topbar-group topbar-end">
+        <button
+          type="button"
+          className={`btn btn-switch${advanced ? ' is-on' : ''}`}
+          aria-pressed={advanced}
+          onClick={() => setAdvanced(!advanced)}
+          title={
+            advanced
+              ? 'Ligada: autoscaling, taxa de acerto do cache, pool de conexões e limites de terceiros entram no cálculo. Clique para desligar.'
+              : 'Liga autoscaling, taxa de acerto do cache, pool de conexões e limites de terceiros nas propriedades dos componentes.'
+          }
+        >
+          <span className="switch-dot" aria-hidden="true" />
+          Modelagem avançada
+        </button>
         {/* TESTE: aberto a todos enquanto o app não está no ar; depois vira recurso do Plano Pro. */}
         <button
           type="button"

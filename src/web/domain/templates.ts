@@ -17,6 +17,7 @@ function doc(name: string, entry: string, traffic: number, nodes: N[], links: L[
     entryPointId: entry,
     trafficRps: traffic,
     safeUtilization: 0.8,
+    advancedModeling: false,
     nodes: nodes.map(([id, label, type, instances, serviceTimeMs, monthlyCostPerInstance, x, y, writeFraction]) => ({
       id,
       type: 'component',
@@ -100,5 +101,5 @@ export const TEMPLATES: readonly Template[] = [
 ];
 
 export function emptyDoc(): DiagramDoc {
-  return { name: 'Novo diagrama', nodes: [], edges: [], entryPointId: null, trafficRps: 100, safeUtilization: 0.8 };
+  return { name: 'Novo diagrama', nodes: [], edges: [], entryPointId: null, trafficRps: 100, safeUtilization: 0.8, advancedModeling: false };
 }

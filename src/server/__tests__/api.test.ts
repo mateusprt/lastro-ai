@@ -62,6 +62,25 @@ describe('API', () => {
     expect((await withWrites(1.5)).status).toBe(400);
   });
 
+  it('aceita os campos da modelagem avançada', async () => {
+    const g = ecommerce();
+    g.components = g.components.map((c) => {
+      if (c.id === 'app') return { ...c, autoscaling: { maxInstances: 8, targetUtilization: 0.6 } };
+      if (c.id === 'cache') return { ...c, hitRate: 0.9 };
+      if (c.id === 'db') return { ...c, connectionPool: { size: 50, extraHoldMs: 5 } };
+      if (c.id === 'pay') return { ...c, rateLimitRps: 20 };
+      return c;
+    });
+    const r = await post('/simulations', { graph: g, entryPointId: 'lb', trafficRps: 100, safeUtilization: 0.8 });
+    expect(r.status).toBe(200);
+    const body = (await r.json()) as any; // eslint-disable-line @typescript-eslint/no-explicit-any
+    const byId = Object.fromEntries(body.components.map((c: { id: string }) => [c.id, c]));
+    expect(byId.app.autoscaling.maxInstances).toBe(8);
+    expect(byId.cache.cache.hitRate).toBe(0.9);
+    expect(byId.db.connectionPool.size).toBe(50);
+    expect(byId.pay.rateLimit.limitRps).toBe(20);
+  });
+
   it('422 com os problemas do diagrama quando o motor rejeita o grafo', async () => {
     const g = ecommerce();
     g.links.push({ source: 'db', target: 'lb', callsPerRequest: 1, async: false });

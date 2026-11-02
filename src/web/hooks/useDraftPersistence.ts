@@ -10,7 +10,7 @@ export function useDraftPersistence(): DraftStatus {
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const unsubscribe = useEditor.subscribe((s, prev) => {
-      if (s.nodes === prev.nodes && s.edges === prev.edges && s.name === prev.name && s.entryPointId === prev.entryPointId && s.trafficRps === prev.trafficRps && s.safeUtilization === prev.safeUtilization) return;
+      if (s.nodes === prev.nodes && s.edges === prev.edges && s.name === prev.name && s.entryPointId === prev.entryPointId && s.trafficRps === prev.trafficRps && s.safeUtilization === prev.safeUtilization && s.advancedModeling === prev.advancedModeling) return;
       clearTimeout(timer);
       timer = setTimeout(() => {
         setStatus(saveDraft(snapshot(useEditor.getState())) ? 'saved' : 'unavailable');

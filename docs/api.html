@@ -1,0 +1,628 @@
+<title>API do Lastro</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  /* Layout: índice fixo à esquerda e texto à direita, como a referência de um manual técnico; vira uma coluna no celular. */
+  :root {
+    --paper: #e8eef2;
+    --surface: #ffffff;
+    --surface-2: #f3f7f9;
+    --ink: #102a43;
+    --ink-2: #3e5a75;
+    --muted: #5f7891;
+    --line: #d2dce4;
+    --line-strong: #9fb3c6;
+    --accent: #0b5cad;
+    --accent-soft: #dbe8f6;
+    --good-ink: #08700a;
+    --good-soft: #e3f4e3;
+    --warning-ink: #8a5a00;
+    --warning-soft: #fdf1d6;
+    --critical-ink: #b42828;
+    --critical-soft: #fbe4e4;
+    --code-bg: #0f2236;
+    --code-fg: #dbe6f0;
+    --code-key: #8cc4ff;
+    --font: 'Hanken Grotesk', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+    --radius: 8px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #0b1620; --surface: #12212e; --surface-2: #172a39; --ink: #e3ebf2; --ink-2: #b4c4d2; --muted: #8ba1b5;
+      --line: #23384a; --line-strong: #3e5669; --accent: #5ca8f2; --accent-soft: #15314c;
+      --good-ink: #5fd35f; --good-soft: #12301a; --warning-ink: #f7c04d; --warning-soft: #352710; --critical-ink: #f17c7c; --critical-soft: #3a1818;
+      --code-bg: #081420; --code-fg: #d2dee9; --code-key: #8cc4ff;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #0b1620; --surface: #12212e; --surface-2: #172a39; --ink: #e3ebf2; --ink-2: #b4c4d2; --muted: #8ba1b5;
+    --line: #23384a; --line-strong: #3e5669; --accent: #5ca8f2; --accent-soft: #15314c;
+    --good-ink: #5fd35f; --good-soft: #12301a; --warning-ink: #f7c04d; --warning-soft: #352710; --critical-ink: #f17c7c; --critical-soft: #3a1818;
+    --code-bg: #081420; --code-fg: #d2dee9; --code-key: #8cc4ff;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font);
+    font-size: 16px;
+    line-height: 1.6;
+    font-variant-numeric: tabular-nums;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  h1, h2, h3, h4 { text-wrap: balance; line-height: 1.25; margin: 0; }
+  p { margin: 0; }
+  a { color: var(--accent); text-underline-offset: 3px; }
+  a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+  code { font-family: var(--mono); font-size: 0.88em; background: var(--surface-2); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; overflow-wrap: anywhere; }
+
+  .page { max-width: 1180px; margin: 0 auto; padding-block: 32px 64px; display: grid; gap: 32px; grid-template-columns: minmax(0, 1fr); }
+  @media (min-width: 960px) { .page { grid-template-columns: 220px minmax(0, 1fr); align-items: start; } }
+
+  /* Índice */
+  .toc { font-size: 14px; }
+  @media (min-width: 960px) { .toc { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 24px); } }
+  .toc details { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 14px; }
+  @media (min-width: 960px) { .toc details { background: none; border: 0; padding: 0; } .toc summary { pointer-events: none; list-style: none; } .toc summary::-webkit-details-marker { display: none; } }
+  .toc summary { font-weight: 700; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); cursor: pointer; }
+  .toc ol { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 2px; }
+  .toc ol ol { margin: 2px 0 4px 12px; }
+  .toc a { color: var(--ink-2); text-decoration: none; display: block; padding: 3px 0; }
+  .toc a:hover { color: var(--accent); }
+
+  main { min-width: 0; display: grid; gap: 56px; }
+  section { display: grid; gap: 16px; min-width: 0; scroll-margin-top: 24px; }
+  section > h2 { font-size: 26px; font-weight: 800; letter-spacing: -0.015em; padding-top: 8px; border-top: 2px solid var(--ink); }
+  section h3 { font-size: 19px; font-weight: 700; margin-top: 12px; }
+  section h4 { font-size: 15px; font-weight: 700; margin-top: 6px; color: var(--ink-2); }
+  .prose { max-width: 68ch; display: grid; gap: 12px; }
+  .prose ul, .prose ol { margin: 0; padding-left: 22px; display: grid; gap: 6px; }
+
+  /* Cabeçalho */
+  .head { display: grid; gap: 14px; }
+  .eyebrow { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+  .head h1 { font-size: clamp(32px, 5vw, 44px); font-weight: 800; letter-spacing: -0.025em; }
+  .lede { font-size: 18px; color: var(--ink-2); max-width: 64ch; }
+  .facts { display: flex; flex-wrap: wrap; gap: 8px 24px; margin: 4px 0 0; padding: 0; list-style: none; font-size: 14px; color: var(--ink-2); }
+  .facts strong { color: var(--ink); font-weight: 600; }
+
+  .note { padding: 12px 14px; border-left: 4px solid var(--warning-ink); background: var(--warning-soft); border-radius: 0 6px 6px 0; max-width: 72ch; }
+  .note strong { font-weight: 700; }
+
+  /* Rota */
+  .route { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-family: var(--mono); font-size: 17px; font-weight: 500; }
+  .method { font-family: var(--font); font-size: 12px; font-weight: 800; letter-spacing: 0.06em; padding: 3px 8px; border-radius: 4px; color: var(--surface); background: var(--accent); }
+  .method.get { background: var(--good-ink); }
+  .route-path { overflow-wrap: anywhere; }
+
+  /* Tabelas */
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: 1px solid var(--line); }
+  thead th { background: var(--surface-2); font-size: 12px; font-weight: 700; color: var(--ink-2); letter-spacing: 0.02em; white-space: nowrap; }
+  tbody tr:last-child > * { border-bottom: 0; }
+  td code, th code { white-space: nowrap; }
+  td.field { white-space: nowrap; font-family: var(--mono); font-size: 13px; }
+  .opt { color: var(--muted); font-size: 12px; font-family: var(--font); }
+
+  /* Código */
+  .code { position: relative; min-width: 0; }
+  .code pre { margin: 0; overflow-x: auto; padding: 16px 18px; background: var(--code-bg); color: var(--code-fg); border-radius: var(--radius); font-family: var(--mono); font-size: 13px; line-height: 1.55; padding-right: 92px; }
+  .code .label { position: absolute; top: 8px; left: 14px; font-family: var(--font); font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--code-key); }
+  .code.labeled pre { padding-top: 32px; }
+  .copy { position: absolute; top: 6px; right: 6px; font: 600 12px var(--font); color: var(--code-fg); background: transparent; border: 1px solid color-mix(in srgb, var(--code-fg) 35%, transparent); border-radius: 5px; padding: 3px 9px; cursor: pointer; }
+  .copy:hover { border-color: var(--code-fg); }
+
+  /* Requisitos */
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 14px; color: var(--ink-2); margin: 0; padding: 0; list-style: none; }
+  .vm { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 4px; border: 1px solid var(--line-strong); font-size: 12px; font-weight: 800; color: var(--ink); background: var(--surface-2); }
+  .req-id { font-family: var(--mono); font-size: 13px; font-weight: 500; white-space: nowrap; }
+  .req-text { min-width: 280px; }
+  .req-text .why { display: block; margin-top: 4px; color: var(--muted); font-size: 13px; }
+  .pill { display: inline-block; white-space: nowrap; font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: 99px; }
+  .pill.ok { color: var(--good-ink); background: var(--good-soft); }
+  .pill.partial { color: var(--warning-ink); background: var(--warning-soft); }
+  .pill.no { color: var(--critical-ink); background: var(--critical-soft); }
+  .tally { display: flex; flex-wrap: wrap; gap: 8px; }
+  .evidence { font-size: 13px; color: var(--ink-2); }
+  .tbr { font-family: var(--mono); font-size: 12px; font-weight: 500; color: var(--warning-ink); }
+
+  footer { color: var(--muted); font-size: 13px; border-top: 1px solid var(--line); padding-top: 16px; }
+  @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+  html { scroll-behavior: smooth; }
+</style>
+
+<div class="page">
+  <nav class="toc" aria-label="Índice">
+    <details open id="toc-details">
+      <summary>Neste documento</summary>
+      <ol>
+        <li><a href="#inicio">Antes de começar</a></li>
+        <li><a href="#convencoes">Unidades e convenções</a></li>
+        <li><a href="#rotas">Rotas</a>
+          <ol>
+            <li><a href="#health">GET /api/health</a></li>
+            <li><a href="#simulations">POST /api/simulations</a></li>
+            <li><a href="#waitlist">POST /api/waitlist/pro</a></li>
+          </ol>
+        </li>
+        <li><a href="#resposta">Campos da resposta</a></li>
+        <li><a href="#erros">Erros</a></li>
+        <li><a href="#limites">Limites</a></li>
+        <li><a href="#requisitos">Requisitos</a></li>
+        <li><a href="#pendencias">Valores a confirmar</a></li>
+      </ol>
+    </details>
+  </nav>
+
+  <main>
+    <header class="head">
+      <p class="eyebrow">Documentação para desenvolvedores</p>
+      <h1>API do Lastro</h1>
+      <p class="lede">A API recebe um diagrama de arquitetura e devolve, para um volume de acessos, a ocupação de cada componente, o tempo de resposta, o gargalo e quantas instâncias faltam. Este documento mostra como chamar cada rota e lista o que a API deve fazer.</p>
+      <ul class="facts">
+        <li><strong>Versão</strong> 0.1.0</li>
+        <li><strong>Formato</strong> JSON (UTF-8)</li>
+        <li><strong>Endereço local</strong> <code>http://localhost:3333/api</code></li>
+        <li><strong>Atualizado em</strong> 2 de novembro de 2026</li>
+      </ul>
+    </header>
+
+    <section id="inicio" aria-labelledby="inicio-t">
+      <h2 id="inicio-t">Antes de começar</h2>
+      <div class="prose">
+        <p>Toda rota fica sob <code>/api</code>. Em desenvolvimento, a API roda na porta 3333 (mude com a variável <code>API_PORT</code>) e o Vite encaminha <code>/api</code> para ela. Em produção, o Caddy serve o frontend e encaminha <code>/api</code> no mesmo domínio.</p>
+        <p>Envie o corpo como JSON, com o cabeçalho <code>Content-Type: application/json</code>. Todo erro volta no mesmo formato, descrito em <a href="#erros">Erros</a>.</p>
+      </div>
+      <p class="note"><strong>A API ainda não tem autenticação nem limite de requisições.</strong> Qualquer cliente pode chamar todas as rotas. Não exponha a API na internet antes de atender os requisitos <a href="#SEG-001">SEG-001</a> e <a href="#SEG-002">SEG-002</a>.</p>
+      <div class="code labeled">
+        <span class="label">Exemplo</span>
+        <pre><code>npm install
+npm run dev:api        # só a API, em http://localhost:3333/api
+curl http://localhost:3333/api/health</code></pre>
+      </div>
+    </section>
+
+    <section id="convencoes" aria-labelledby="convencoes-t">
+      <h2 id="convencoes-t">Unidades e convenções</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Grandeza</th><th scope="col">Unidade</th><th scope="col">Exemplo</th></tr></thead>
+          <tbody>
+            <tr><td>Tempo (entrada e saída)</td><td>milissegundos (ms)</td><td><code>serviceTimeMs: 20</code></td></tr>
+            <tr><td>Tráfego e vazão</td><td>requisições por segundo (req/s)</td><td><code>trafficRps: 100</code></td></tr>
+            <tr><td>Utilização, limite seguro, frações</td><td>fração entre 0 e 1</td><td><code>0.8</code> = 80%</td></tr>
+            <tr><td>Custo</td><td>reais por mês</td><td><code>monthlyCostPerInstance: 450</code></td></tr>
+            <tr><td>Ilimitado</td><td><code>null</code></td><td>tempo de resposta de um componente saturado</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="prose">
+        <p><code>null</code> num tempo quer dizer que a fila cresce sem limite (o componente está saturado). <code>null</code> numa capacidade quer dizer que nada no caminho limita o tráfego. A API nunca devolve <code>Infinity</code>, que não existe em JSON.</p>
+        <p>Uma <strong>visita</strong> é uma passagem de uma requisição de entrada por um componente. Se a API chama o banco em 40% das requisições, o banco recebe 0,4 visita por requisição de entrada.</p>
+      </div>
+    </section>
+
+    <section id="rotas" aria-labelledby="rotas-t">
+      <h2 id="rotas-t">Rotas</h2>
+
+      <h3 id="health"><span class="route"><span class="method get">GET</span><span class="route-path">/api/health</span></span></h3>
+      <div class="prose"><p>Diz se o servidor está no ar. Use em monitoramento e na checagem do balanceador. Não recebe corpo.</p></div>
+      <div class="code labeled"><span class="label">Resposta 200</span><pre><code>{ "status": "ok" }</code></pre></div>
+
+      <h3 id="simulations"><span class="route"><span class="method">POST</span><span class="route-path">/api/simulations</span></span></h3>
+      <div class="prose">
+        <p>Simula um diagrama num volume de acessos. A resposta traz o resultado de cada componente, de cada ligação, do sistema inteiro e a curva do tempo de resposta. O cálculo é puro e síncrono: a mesma entrada sempre gera a mesma saída.</p>
+      </div>
+
+      <h4>Corpo da requisição</h4>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Campo</th><th scope="col">Tipo</th><th scope="col">Regra</th></tr></thead>
+          <tbody>
+            <tr><td class="field">graph.components</td><td>lista</td><td>De 1 a 200 componentes. Veja a tabela abaixo.</td></tr>
+            <tr><td class="field">graph.links</td><td>lista</td><td>De 0 a 1.000 ligações. Sem ciclos.</td></tr>
+            <tr><td class="field">entryPointId</td><td>texto</td><td>Id do componente que recebe o tráfego de entrada.</td></tr>
+            <tr><td class="field">trafficRps</td><td>número</td><td>De 0 a 10.000.000 req/s.</td></tr>
+            <tr><td class="field">safeUtilization</td><td>número</td><td>Maior que 0 e menor que 1. O produto usa 0,8.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h4>Componente</h4>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Campo</th><th scope="col">Tipo</th><th scope="col">Regra</th></tr></thead>
+          <tbody>
+            <tr><td class="field">id</td><td>texto</td><td>De 1 a 64 caracteres, único no diagrama.</td></tr>
+            <tr><td class="field">name</td><td>texto</td><td>Até 80 caracteres. Pode ser vazio.</td></tr>
+            <tr><td class="field">type</td><td>texto</td><td>Um de: <code>load_balancer</code>, <code>app</code>, <code>cache</code>, <code>database</code>, <code>queue</code>, <code>worker</code>, <code>external</code>.</td></tr>
+            <tr><td class="field">instances</td><td>inteiro</td><td>De 1 a 10.000. Com autoscaling, é o mínimo.</td></tr>
+            <tr><td class="field">serviceTimeMs</td><td>número</td><td>Maior que 0 e até 3.600.000. Em <code>external</code>, é a latência fixa e pode ser 0.</td></tr>
+            <tr><td class="field">monthlyCostPerInstance</td><td>número</td><td>0 ou mais.</td></tr>
+            <tr><td class="field">writeFraction <span class="opt">opcional</span></td><td>número</td><td>Só <code>database</code>. De 0 a 1. Padrão: 0,2.</td></tr>
+            <tr><td class="field">autoscaling <span class="opt">opcional</span></td><td>objeto</td><td>Só <code>app</code> e <code>worker</code>. <code>maxInstances</code>: inteiro entre <code>instances</code> e 10.000. <code>targetUtilization</code>: maior que 0 e menor que 1.</td></tr>
+            <tr><td class="field">hitRate <span class="opt">opcional</span></td><td>número</td><td>Só <code>cache</code>. De 0 a 1.</td></tr>
+            <tr><td class="field">connectionPool <span class="opt">opcional</span></td><td>objeto</td><td>Só <code>database</code>. <code>size</code>: inteiro de 1 ou mais. <code>extraHoldMs</code>: 0 ou mais.</td></tr>
+            <tr><td class="field">rateLimitRps <span class="opt">opcional</span></td><td>número</td><td>Só <code>external</code>. Maior que 0 e até 10.000.000.</td></tr>
+            <tr><td class="field">position <span class="opt">opcional</span></td><td>objeto</td><td><code>{ x, y }</code>. Não muda o resultado.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="prose">
+        <p>Os campos opcionais da modelagem avançada só valem para o tipo indicado. Num tipo diferente, a API os valida e depois os ignora. Sem nenhum deles, o cálculo é o do modelo básico.</p>
+      </div>
+
+      <h4>Ligação</h4>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Campo</th><th scope="col">Tipo</th><th scope="col">Regra</th></tr></thead>
+          <tbody>
+            <tr><td class="field">id <span class="opt">opcional</span></td><td>texto</td><td>De 1 a 64 caracteres. Volta igual na resposta.</td></tr>
+            <tr><td class="field">source</td><td>texto</td><td>Id do componente que chama.</td></tr>
+            <tr><td class="field">target</td><td>texto</td><td>Id do componente chamado. Diferente de <code>source</code>.</td></tr>
+            <tr><td class="field">callsPerRequest</td><td>número</td><td>0 ou mais. 0,4 = em 40% das requisições; 2 = duas chamadas cada.</td></tr>
+            <tr><td class="field">async</td><td>booleano</td><td><code>true</code>: a origem não espera a resposta. Gera carga, mas não soma no tempo do usuário.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="code labeled">
+        <span class="label">Requisição</span>
+        <pre><code>curl -X POST http://localhost:3333/api/simulations \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "graph": {
+    "components": [
+      { "id": "lb",  "name": "Balanceador", "type": "load_balancer", "instances": 1, "serviceTimeMs": 1,  "monthlyCostPerInstance": 120 },
+      { "id": "api", "name": "API",         "type": "app",           "instances": 2, "serviceTimeMs": 20, "monthlyCostPerInstance": 450 },
+      { "id": "db",  "name": "Postgres",    "type": "database",      "instances": 1, "serviceTimeMs": 10, "monthlyCostPerInstance": 1800 }
+    ],
+    "links": [
+      { "id": "l1", "source": "lb",  "target": "api", "callsPerRequest": 1,   "async": false },
+      { "id": "l2", "source": "api", "target": "db",  "callsPerRequest": 0.5, "async": false }
+    ]
+  },
+  "entryPointId": "lb",
+  "trafficRps": 50,
+  "safeUtilization": 0.8
+}'</code></pre>
+      </div>
+
+      <div class="code labeled">
+        <span class="label">Resposta 200 (resumida)</span>
+        <pre><code>{
+  "input": { "entryPointId": "lb", "trafficRps": 50, "safeUtilization": 0.8 },
+  "components": [
+    {
+      "id": "api", "name": "API", "type": "app", "reachable": true,
+      "visits": 1, "syncVisits": 1, "throughputRps": 50, "serviceDemandMs": 20,
+      "instances": 2, "monthlyCost": 900,
+      "utilization": 0.5, "saturated": false, "status": "ok",
+      "waitProbability": 0.3333, "waitTimeMs": 6.667, "responseTimeMs": 26.667,
+      "requiredInstances": 2, "additionalInstances": 0, "extraMonthlyCost": 0,
+      "maxEntryRps": 100, "safeEntryRps": 80
+    }
+    // ... "lb" e "db" no mesmo formato. Bancos trazem também "database".
+  ],
+  "links": [
+    { "id": "l1", "source": "lb",  "target": "api", "async": false, "throughputRps": 50 },
+    { "id": "l2", "source": "api", "target": "db",  "async": false, "throughputRps": 25 }
+  ],
+  "system": {
+    "bottleneckId": "api", "safeCapacityRps": 80, "maxCapacityRps": 100,
+    "saturated": false, "responseTimeMs": 34.386,
+    "hasBackgroundWork": false, "backgroundDelayMs": 0,
+    "requestsInFlight": 1.719, "monthlyCost": 2820, "extraMonthlyCost": 0
+  },
+  "curve": [
+    { "trafficRps": 0,  "responseTimeMs": 26 },
+    { "trafficRps": 98, "responseTimeMs": 515.96 }
+    // 50 pontos no total, de 0 a 98% da capacidade máxima
+  ]
+}</code></pre>
+      </div>
+      <p class="prose">Os números acima saíram do motor real para essa requisição, arredondados para caber na página.</p>
+
+      <h3 id="waitlist"><span class="route"><span class="method">POST</span><span class="route-path">/api/waitlist/pro</span></span></h3>
+      <div class="prose">
+        <p>Inscreve o visitante na lista de espera do Plano Pro e guarda qual recurso motivou o clique. A rota é provisória: as inscrições ficam na memória do processo e somem quando o servidor reinicia (veja <a href="#API-013">API-013</a>).</p>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Campo</th><th scope="col">Tipo</th><th scope="col">Regra</th></tr></thead>
+          <tbody><tr><td class="field">feature</td><td>texto</td><td>De 1 a 40 caracteres. O frontend envia <code>header</code>, <code>cost</code> ou <code>scenarios</code>.</td></tr></tbody>
+        </table>
+      </div>
+      <div class="code labeled"><span class="label">Resposta 201</span><pre><code>{ "subscribed": true }</code></pre></div>
+    </section>
+
+    <section id="resposta" aria-labelledby="resposta-t">
+      <h2 id="resposta-t">Campos da resposta</h2>
+
+      <h4>Cada item de <code>components</code></h4>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Campo</th><th scope="col">O que é</th></tr></thead>
+          <tbody>
+            <tr><td class="field">reachable</td><td>Existe caminho do ponto de entrada até o componente. Se for <code>false</code>, ele não recebe carga.</td></tr>
+            <tr><td class="field">visits, syncVisits</td><td>Visitas por requisição de entrada. <code>syncVisits</code> conta só as que o usuário espera.</td></tr>
+            <tr><td class="field">throughputRps</td><td>Vazão no componente: tráfego de entrada × visitas.</td></tr>
+            <tr><td class="field">serviceDemandMs</td><td>Visitas × tempo de serviço, por requisição de entrada.</td></tr>
+            <tr><td class="field">utilization</td><td>Ocupação média por instância: vazão × tempo de serviço ÷ instâncias. Passa de 1 quando satura. Num banco com réplicas ou pool, é a maior das filas.</td></tr>
+            <tr><td class="field">saturated</td><td>A fila cresce sem limite.</td></tr>
+            <tr><td class="field">waitProbability</td><td>Chance de uma visita esperar na fila (Erlang C).</td></tr>
+            <tr><td class="field">waitTimeMs, responseTimeMs</td><td>Espera na fila e tempo total por visita. <code>null</code> se saturado.</td></tr>
+            <tr><td class="field">status</td><td><code>ok</code>, <code>warning</code> (a partir de 75% do limite seguro) ou <code>critical</code> (no limite seguro ou acima).</td></tr>
+            <tr><td class="field">instances</td><td>Instâncias consideradas. Com autoscaling, as ligadas nesse tráfego.</td></tr>
+            <tr><td class="field">requiredInstances, additionalInstances</td><td>Instâncias para ficar abaixo do limite seguro e quantas faltam.</td></tr>
+            <tr><td class="field">monthlyCost, extraMonthlyCost</td><td>Custo mensal das instâncias e custo das que faltam.</td></tr>
+            <tr><td class="field">maxEntryRps, safeEntryRps</td><td>Tráfego de entrada que leva o componente a 100% e ao limite seguro. <code>null</code> se ilimitado.</td></tr>
+            <tr><td class="field">database <span class="opt">só banco</span></td><td><code>primary</code> e <code>replicas</code> (cada um com servidores, vazão, ocupação, tempo, situação e capacidades), <code>limitedBy</code> e <code>primaryOverSafe</code>.</td></tr>
+            <tr><td class="field">autoscaling <span class="opt">avançado</span></td><td><code>minInstances</code>, <code>maxInstances</code>, <code>targetUtilization</code>, <code>activeInstances</code>, <code>atMax</code>, <code>requiredMaxInstances</code>.</td></tr>
+            <tr><td class="field">cache <span class="opt">avançado</span></td><td><code>hitRate</code>, <code>hitsRps</code>, <code>missesRps</code>.</td></tr>
+            <tr><td class="field">connectionPool <span class="opt">avançado</span></td><td><code>size</code>, <code>extraHoldMs</code>, <code>inUse</code>, <code>utilization</code>, <code>saturated</code>, <code>status</code>, <code>waitTimeMs</code>, <code>maxEntryRps</code>, <code>requiredSize</code>, <code>limiting</code>.</td></tr>
+            <tr><td class="field">rateLimit <span class="opt">avançado</span></td><td><code>limitRps</code>, <code>utilization</code>, <code>requiredLimitRps</code>.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h4><code>system</code></h4>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Campo</th><th scope="col">O que é</th></tr></thead>
+          <tbody>
+            <tr><td class="field">bottleneckId</td><td>Componente que satura primeiro quando o tráfego cresce. <code>null</code> se nada no caminho tem limite.</td></tr>
+            <tr><td class="field">maxCapacityRps, safeCapacityRps</td><td>Tráfego de entrada que leva o gargalo a 100% e ao limite seguro.</td></tr>
+            <tr><td class="field">saturated</td><td>Algum componente alcançável está saturado.</td></tr>
+            <tr><td class="field">responseTimeMs</td><td>Tempo de ponta a ponta no caminho síncrono: soma de visitas síncronas × tempo por visita.</td></tr>
+            <tr><td class="field">hasBackgroundWork, backgroundDelayMs</td><td>Se há ligações assíncronas com carga e quanto tempo o trabalho delas leva. Vale o ramo mais lento.</td></tr>
+            <tr><td class="field">requestsInFlight</td><td>Requisições em andamento, pela Lei de Little: tráfego × tempo de resposta.</td></tr>
+            <tr><td class="field">monthlyCost, extraMonthlyCost</td><td>Soma dos custos de todos os componentes.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h4><code>links</code> e <code>curve</code></h4>
+      <div class="prose">
+        <p>Cada ligação volta com <code>throughputRps</code>, as chamadas por segundo que passam por ela. A <code>curve</code> tem 50 pontos <code>{ trafficRps, responseTimeMs }</code>, de 0 até 98% da capacidade máxima. Se a capacidade for ilimitada, a curva vai até o dobro do tráfego pedido.</p>
+      </div>
+    </section>
+
+    <section id="erros" aria-labelledby="erros-t">
+      <h2 id="erros-t">Erros</h2>
+      <div class="prose"><p>Todo erro volta com o mesmo corpo. Use <code>code</code> no programa: ele não muda. A mensagem pode mudar de texto.</p></div>
+      <div class="code"><pre><code>{ "error": { "code": "TEXTO_ESTAVEL", "message": "Frase em português.", "details": [] } }</code></pre></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Status</th><th scope="col">code</th><th scope="col">Quando acontece</th><th scope="col">details</th></tr></thead>
+          <tbody>
+            <tr><td>400</td><td><code>INVALID_REQUEST</code></td><td>Campo ausente, tipo errado ou valor fora da regra.</td><td>Lista de <code>{ path, message }</code></td></tr>
+            <tr><td>400</td><td><code>INVALID_JSON</code></td><td>O corpo não é JSON válido.</td><td>—</td></tr>
+            <tr><td>413</td><td><code>PAYLOAD_TOO_LARGE</code></td><td>O corpo passa de 256 KB.</td><td>—</td></tr>
+            <tr><td>422</td><td><code>INVALID_GRAPH</code></td><td>O formato está certo, mas o diagrama não pode ser simulado (ciclo, referência inexistente e outros).</td><td>Lista de problemas</td></tr>
+            <tr><td>404</td><td><code>NOT_FOUND</code></td><td>Rota desconhecida.</td><td>—</td></tr>
+            <tr><td>500</td><td><code>INTERNAL_ERROR</code></td><td>Erro inesperado no servidor.</td><td>—</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="code labeled"><span class="label">400, real</span><pre><code>{
+  "error": {
+    "code": "INVALID_REQUEST",
+    "message": "A requisição tem campos inválidos.",
+    "details": [
+      { "path": "graph.components", "message": "\"graph.components\" must contain at least 1 items" },
+      { "path": "trafficRps", "message": "\"trafficRps\" must be a number" }
+    ]
+  }
+}</code></pre></div>
+      <div class="code labeled"><span class="label">422, real</span><pre><code>{
+  "error": {
+    "code": "INVALID_GRAPH",
+    "message": "O diagrama não pode ser simulado.",
+    "details": [
+      { "code": "CYCLE", "message": "O diagrama tem um ciclo: a → b → a. Chamadas circulares não são suportadas.", "componentIds": ["a", "b"] }
+    ]
+  }
+}</code></pre></div>
+
+      <h4>Problemas de diagrama (details de um 422)</h4>
+      <div class="prose"><p>Cada problema traz <code>code</code> e <code>message</code>, e pode trazer <code>componentIds</code> (para destacar no editor) e <code>linkIndex</code> (posição da ligação em <code>graph.links</code>). A API junta todos os problemas numa resposta só. Alguns deles a validação de formato pega antes, com 400.</p></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">code</th><th scope="col">Quando acontece</th></tr></thead>
+          <tbody>
+            <tr><td><code>EMPTY_GRAPH</code></td><td>O diagrama não tem componentes.</td></tr>
+            <tr><td><code>TOO_MANY_COMPONENTS</code>, <code>TOO_MANY_LINKS</code></td><td>Mais de 200 componentes ou 1.000 ligações.</td></tr>
+            <tr><td><code>INVALID_COMPONENT_ID</code>, <code>DUPLICATE_COMPONENT_ID</code></td><td>Componente sem id ou com id repetido.</td></tr>
+            <tr><td><code>INVALID_COMPONENT_TYPE</code></td><td>Tipo desconhecido.</td></tr>
+            <tr><td><code>INVALID_INSTANCES</code></td><td>Instâncias fora de 1 a 10.000 ou não inteiras.</td></tr>
+            <tr><td><code>INVALID_SERVICE_TIME</code></td><td>Tempo de serviço fora da regra do tipo.</td></tr>
+            <tr><td><code>INVALID_COST</code></td><td>Custo negativo.</td></tr>
+            <tr><td><code>INVALID_WRITE_FRACTION</code></td><td>Escritas fora de 0 a 1.</td></tr>
+            <tr><td><code>INVALID_AUTOSCALING</code></td><td>Máximo menor que o mínimo, ou alvo fora de (0, 1).</td></tr>
+            <tr><td><code>INVALID_HIT_RATE</code></td><td>Taxa de acerto fora de 0 a 1.</td></tr>
+            <tr><td><code>INVALID_CONNECTION_POOL</code></td><td>Pool sem conexão ou tempo extra negativo.</td></tr>
+            <tr><td><code>INVALID_RATE_LIMIT</code></td><td>Limite de chamadas 0 ou negativo.</td></tr>
+            <tr><td><code>UNKNOWN_LINK_SOURCE</code>, <code>UNKNOWN_LINK_TARGET</code></td><td>Ligação com origem ou destino inexistente.</td></tr>
+            <tr><td><code>SELF_LINK</code></td><td>Componente que chama a si mesmo.</td></tr>
+            <tr><td><code>DUPLICATE_LINK</code></td><td>Duas ligações entre os mesmos componentes, no mesmo sentido.</td></tr>
+            <tr><td><code>INVALID_LINK_WEIGHT</code></td><td>Chamadas por requisição negativas.</td></tr>
+            <tr><td><code>CYCLE</code></td><td>Chamadas em círculo. A mensagem mostra o caminho.</td></tr>
+            <tr><td><code>UNKNOWN_ENTRY_POINT</code></td><td>O ponto de entrada não existe no diagrama.</td></tr>
+            <tr><td><code>INVALID_TRAFFIC</code>, <code>INVALID_SAFE_UTILIZATION</code></td><td>Tráfego ou limite seguro fora da regra.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="limites" aria-labelledby="limites-t">
+      <h2 id="limites-t">Limites</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Limite</th><th scope="col">Valor</th><th scope="col">Erro</th></tr></thead>
+          <tbody>
+            <tr><td>Tamanho do corpo</td><td>256 KB</td><td>413</td></tr>
+            <tr><td>Componentes por diagrama</td><td>200</td><td>400</td></tr>
+            <tr><td>Ligações por diagrama</td><td>1.000</td><td>400</td></tr>
+            <tr><td>Instâncias por componente</td><td>10.000</td><td>422</td></tr>
+            <tr><td>Tempo de serviço</td><td>3.600.000 ms (1 hora)</td><td>422</td></tr>
+            <tr><td>Tráfego de entrada</td><td>10.000.000 req/s</td><td>422</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="prose"><p>Estes limites protegem o servidor. Os limites de plano (por exemplo, menos componentes no plano gratuito) ainda não existem; veja <a href="#SEG-006">SEG-006</a>.</p></div>
+    </section>
+
+    <section id="requisitos" aria-labelledby="requisitos-t">
+      <h2 id="requisitos-t">Requisitos</h2>
+      <div class="prose">
+        <p>Os requisitos seguem o apêndice “How to Write a Good Requirement” do <em>NASA Systems Engineering Handbook</em>. Cada um tem um identificador único, descreve uma só capacidade, pode ser verificado e diz por que existe.</p>
+        <ul>
+          <li><strong>deve</strong> marca um requisito obrigatório (o “shall” do manual). <strong>vai</strong> marca um fato, e <strong>deveria</strong>, uma meta.</li>
+          <li><span class="tbr">[TBR]</span> marca um valor escrito, mas que ainda precisa ser confirmado. A lista está em <a href="#pendencias">Valores a confirmar</a>.</li>
+        </ul>
+      </div>
+      <ul class="legend" aria-label="Métodos de verificação">
+        <li><span class="vm">T</span> Teste automatizado ou medição</li>
+        <li><span class="vm">A</span> Análise</li>
+        <li><span class="vm">I</span> Inspeção do código</li>
+        <li><span class="vm">D</span> Demonstração</li>
+      </ul>
+      <div class="tally" aria-label="Situação dos requisitos">
+        <span class="pill ok">24 atendidos</span>
+        <span class="pill partial">3 parciais</span>
+        <span class="pill no">6 não atendidos</span>
+      </div>
+
+      <h3>API</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Id</th><th scope="col">Requisito</th><th scope="col">Verificação</th><th scope="col">Situação</th></tr></thead>
+          <tbody>
+            <tr id="API-001"><td class="req-id">API-001</td><td class="req-text">A API deve responder a <code>GET /api/health</code> com status 200 e o corpo <code>{"status":"ok"}</code>.<span class="why">Por quê: o monitoramento e o balanceador usam essa rota para saber se o servidor está no ar.</span></td><td><span class="vm">T</span> <span class="evidence">api.test.ts</span></td><td><span class="pill ok">Atendido</span></td></tr>
+            <tr id="API-002"><td class="req-id">API-002</td><td class="req-text">A API deve aceitar em <code>POST /api/simulations</code> diagramas com 1 a 200 componentes e 0 a 1.000 ligações.<span class="why">Por quê: limita o trabalho de uma requisição e protege o servidor.</span></td><td><span class="vm">T</span> <span class="evidence">GraphValidator.test.ts</span></td><td><span class="pill ok">Atendido</span></td></tr>
+            <tr id="API-003"><td class="req-id">API-003</td><td class="req-text">A API deve responder com status 400 e o código <code>INVALID_REQUEST</code> quando um campo obrigatório faltar ou tiver o tipo errado.<span class="why">Por quê: o cliente precisa distinguir erro de formato de erro de diagrama.</span></td><td><span class="vm">T</span> <span class="evidence">api.test.ts</span></td><td><span class="pill ok">Atendido</span></td></tr>
+            <tr id="API-004"><td class="req-id">API-004</td><td class="req-text">A API deve listar em <code>error.details</code> o caminho de cada campo inválido de uma resposta 400.<span class="why">Por quê: o cliente precisa saber qual campo corrigir.</span></td><td><span class="vm">T</span> <span class="evidence">api.test.ts</span></td><td><span class="pill ok">Atendido</span></td></tr>
+            <tr id="API-005"><td class="req-id">API-005</td><td class="req-text">A API deve escrever em português a mensagem de cada campo inválido de uma resposta 400.<span class="why">Por quê: as mensagens podem chegar ao usuário, e o produto é em português. Hoje elas vêm em inglês, no texto padrão do Joi.</span></td><td><span class="vm">D</span> <span class="evidence">resposta real em 2/11/2026</span></td><td><span class="pill no">Não atendido</span></td></tr>
+            <tr id="API-006"><td class="req-id">API-006</td><td class="req-text">A API deve responder com status 400 e o código <code>INVALID_JSON</code> quando o corpo não for JSON válido.<span class="why">Por quê: separa corpo malformado de campos inválidos.</span></td><td><span class="vm">T</span> <span class="evidence">api.test.ts</span></td><td><span class="pill ok">Atendido</span></td></tr>
+            <tr id="API-007"><td class="req-id">API-007</td><td class="req-text">A API deve responder com status 413 e o código <code>PAYLOAD_TOO_LARGE</code> quando o corpo passar de 256 KB.<span class="why">Por quê: impede que um corpo grande demais ocupe o servidor.</span></td><td><span class="vm">D</span> <span class="evidence">corpo de 300 KB em 2/11/2026; sem teste automatizado</span></td><td><span class="pill ok">Atendido</span></td></tr>
+            <tr id="API-008"><td class="req-id">API-008</td><td class="req-text">A API deve responder com status 422 e o código <code>INVALID_GRAPH</code>, com todos os problemas do diagrama numa única resposta, quando o diagrama não puder ser simulado.<span class="why">Por quê: o editor destaca todos os problemas de uma vez.</span></td><td><span class="vm">T</span> <span class="evidence">GraphValidator.test.ts, api.test.ts</span></td><td><span class="pill ok">Atendido</span></td></tr>
+            <tr id="API-009"><td class="req-id">API-009</td><td class="req-text">A API deve incluir os ids dos componentes envolvidos em cada problema de diagrama que envolva componentes.<span class="why">Por quê: o editor destaca no diagrama o componente com problema.</span></td><td><span class="vm">T</span> <span class="evidence">GraphValidator.test.ts</span></td><td><span class="pill ok">Atendido</span></td></tr>
+            <tr id="API-010"><td class="req-id">API-010</td><td class="req-text">A API deve responder com status 404 e o código <code>NOT_FOUND</code> a toda rota desconhecida sob <code>/api</code>.<span class="why">Por quê: o cliente recebe erro no formato padrão, e não uma página HTML.</span></td><td><span class="vm">T</span> <span class="evidence">api.test.ts</span></td><td><span class="pill ok">Atendido</span></td></tr>
+            <tr id="API-011"><td class="req-id">API-011</td><td class="req-text">A API deve descartar, antes de simular, todo campo do corpo que não conste deste documento.<span class="why">Por quê: campos estranhos não chegam ao motor.</span></td><td><span class="vm">I</span> <span class="evidence">validateBody.ts</span></td><td><span class="pill ok">Atendido</span></td></tr>
+            <tr id="API-012"><td class="req-id">API-012</td><td class="req-text">A API deve responder com status 201 e <code>{"subscribed":true}</code> a <code>POST /api/waitlist/pro</code> com <code>feature</code> de 1 a 40 caracteres.<span class="why">Por quê: mede o interesse no Plano Pro e qual recurso o motivou.</span></td><td><span class="vm">T</span> <span class="evidence">api.test.ts</span></td><td><span class="pill ok">Atendido</span></td></tr>
+            <tr id="API-013"><td class="req-id">API-013</td><td class="req-text">A API deve manter as inscrições da lista de espera depois de um reinício do servidor.<span class="why">Por quê: hoje as inscrições ficam em memória e se perdem a cada deploy.</span></td><td><span class="vm">I</span> <span class="evidence">routes/waitlist.ts</span></td><td><span class="pill no">Não atendido</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Cálculo</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Id</th><th scope="col">Requisito</th><th scope="col">Verificação</th><th scope="col">Situação</th></tr></thead>
+          <tbody>
+            <tr id="CAL-001"><td class="req-id">CAL-001</td><td class="req-text">A API deve devolver, para cada componente, a vazão, a utilização, o tempo de resposta, a situação e as instâncias necessárias no tráfego pedido.<span class="why">Por quê: são os números que o editor mostra em cada componente.</span></td><td><span class="vm">T</span> <span class="evidence">SimulationEngine.test.ts</span></td><td><span class="pill ok">Atendido</span></td></tr>
+            <tr id="CAL-002"><td class="req-id">CAL-002</td><td class="req-text">A API deve calcular o tempo de resposta de cada fila pelo modelo M/M/c (Erlang C).<span class="why">Por quê: é o modelo que o produto promete. Os testes conferem contra a fórmula direta.</span></td><td><span class="vm">T</span> <span class="evidence">QueueModel.test.ts</span></td><td><span class="pill ok">Atendido</span></td></tr>
+            <tr id="CAL-003"><td class="req-id">CAL-003</td><td class="req-text">A API deve marcar como <code>critical</code> todo componente com utilização igual ou maior que o limite seguro.<span class="why">Por quê: o vermelho do editor tem de bater com o limite que o usuário escolheu.</span></td><td><span class="vm">T</span> <span class="evidence">SimulationEngine.test.ts</span></td><td><span class="pill ok">Atendido</span></td></tr>
+            <tr id="CAL-004"><td class="req-id">CAL-004</td><td class="req-text">A API deve marcar como <code>warning</code> todo componente com utilização igual ou maior que 75% do limite seguro e menor que o limite seguro.<span class="why">Por quê: avisa antes de o componente chegar ao limite.</span></td><td><span class="vm">T</span> <span class="evidence">SimulationEngine.test.ts</span></td><td><span class="pill ok">Atendido</span></td></tr>
+            <tr id="CAL-005"><td class="req-id">CAL-005</td><td class="req-text">A API deve devolver <code>null</code> em todo tempo ou capacidade ilimitados.<span class="why">Por quê: <code>Infinity</code> não existe em JSON.</span></td><td><span class="vm">T</span> <span class="evidence">SimulationEngine.test.ts, AdvancedModeling.test.ts</span></td><td><span class="pill ok">Atendido</span></td></tr>
+            <tr id="CAL-006"><td class="req-id">CAL-006</td><td class="req-text">A API deve devolver o mesmo resultado sempre que receber a mesma entrada.<span class="why">Por quê: dois usuários com o mesmo diagrama precisam ver os mesmos números.</span></td><td><span class="vm">A</span> <span class="evidence">o motor não lê relógio, rede nem estado</span></td><td><span class="pill ok">Atendido</span></td></tr>
+            <tr id="CAL-007"><td class="req-id">CAL-007</td><td class="req-text">A API deve tratar um banco com mais de uma instância como um primário, que recebe só as escritas, e réplicas, que recebem só as leituras.<span class="why">Por quê: somar a capacidade de todas as instâncias superestima bancos com muitas escritas.</span></td><td><span class="vm">T</span> <span class="evidence">SimulationEngine.test.ts</span></td><td><span class="pill ok">Atendido</span></td></tr>
+            <tr id="CAL-008"><td class="req-id">CAL-008</td><td class="req-text">A API deve calcular pelo modelo básico todo componente que não traga campos da modelagem avançada.<span class="why">Por quê: ligar a modelagem avançada não pode mudar o que já funcionava.</span></td><td><span class="vm">T</span> <span class="evidence">suíte básica sem alteração</span></td><td><span class="pill ok">Atendido</span></td></tr>
+            <tr id="CAL-009"><td class="req-id">CAL-009</td><td class="req-text">A API deve considerar ligadas, num componente com autoscaling, ⌈carga ÷ ocupação-alvo⌉ instâncias, entre o mínimo e o máximo.<span class="why">Por quê: o custo e o tempo de resposta dependem das instâncias que estão de fato ligadas.</span></td><td><span class="vm">T</span> <span class="evidence">AdvancedModeling.test.ts</span></td><td><span class="pill ok">Atendido</span></td></tr>
+            <tr id="CAL-010"><td class="req-id">CAL-010</td><td class="req-text">A API deve encaminhar pelas ligações que saem de um cache só a fração (1 − taxa de acerto) das requisições.<span class="why">Por quê: o que o cache responde não chega ao banco.</span></td><td><span class="vm">T</span> <span class="evidence">AdvancedModeling.test.ts</span></td><td><span class="pill ok">Atendido</span></td></tr>
+            <tr id="CAL-011"><td class="req-id">CAL-011</td><td class="req-text">A API deve somar ao tempo de resposta de um banco com pool a espera por uma conexão livre.<span class="why">Por quê: o pool costuma esgotar antes da capacidade do banco.</span></td><td><span class="vm">T</span> <span class="evidence">AdvancedModeling.test.ts</span></td><td><span class="pill ok">Atendido</span></td></tr>
+            <tr id="CAL-012"><td class="req-id">CAL-012</td><td class="req-text">A API deve marcar como saturado o serviço externo cujas chamadas por segundo alcancem o limite do fornecedor.<span class="why">Por quê: acima do limite o fornecedor recusa as chamadas.</span></td><td><span class="vm">T</span> <span class="evidence">AdvancedModeling.test.ts</span></td><td><span class="pill ok">Atendido</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Desempenho</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Id</th><th scope="col">Requisito</th><th scope="col">Verificação</th><th scope="col">Situação</th></tr></thead>
+          <tbody>
+            <tr id="DES-001"><td class="req-id">DES-001</td><td class="req-text">A API deve concluir no servidor a simulação de um diagrama de 200 componentes e 1.000 ligações em até 100 ms.<span class="why">Por quê: o editor simula a cada edição. Com esse tempo, o resultado aparece logo depois de o usuário parar de digitar.</span></td><td><span class="vm">T</span> <span class="evidence">medição manual em 2/11/2026, máquina de desenvolvimento, 200 componentes e 985 ligações: mediana de 1,5 ms e máximo de 9,7 ms em 30 execuções. Falta teste automatizado e medição no servidor de produção.</span></td><td><span class="pill partial">Parcial</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Segurança e operação</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Id</th><th scope="col">Requisito</th><th scope="col">Verificação</th><th scope="col">Situação</th></tr></thead>
+          <tbody>
+            <tr id="SEG-001"><td class="req-id">SEG-001</td><td class="req-text">A API deve responder com status 401 a toda chamada a <code>POST /api/simulations</code> sem sessão válida.<span class="why">Por quê: sem login, qualquer um usa o servidor. O frontend já trata o 401 e tenta renovar a sessão em <code>/api/auth/refresh</code>, rota que ainda não existe.</span></td><td><span class="vm">T</span></td><td><span class="pill no">Não atendido</span></td></tr>
+            <tr id="SEG-002"><td class="req-id">SEG-002</td><td class="req-text">A API deve responder com status 429 ao cliente que passar de <span class="tbr">60 [TBR]</span> simulações por minuto.<span class="why">Por quê: impede que um cliente sozinho ocupe o servidor.</span></td><td><span class="vm">T</span></td><td><span class="pill no">Não atendido</span></td></tr>
+            <tr id="SEG-003"><td class="req-id">SEG-003</td><td class="req-text">A API deve enviar em toda resposta o cabeçalho <code>X-Content-Type-Options: nosniff</code>.<span class="why">Por quê: impede que o navegador interprete o JSON como outro tipo de arquivo.</span></td><td><span class="vm">T</span></td><td><span class="pill no">Não atendido</span></td></tr>
+            <tr id="SEG-004"><td class="req-id">SEG-004</td><td class="req-text">A API deve omitir o cabeçalho <code>X-Powered-By</code> de toda resposta.<span class="why">Por quê: não revela a tecnologia do servidor.</span></td><td><span class="vm">I</span> <span class="evidence">app.ts</span></td><td><span class="pill ok">Atendido</span></td></tr>
+            <tr id="SEG-005"><td class="req-id">SEG-005</td><td class="req-text">A API deve registrar num serviço de monitoramento de erros todo erro que gere status 500.<span class="why">Por quê: a equipe precisa saber do erro sem esperar o usuário reclamar. Hoje o erro vai só para o console do servidor.</span></td><td><span class="vm">I</span> <span class="evidence">errorHandler.ts</span></td><td><span class="pill partial">Parcial</span></td></tr>
+            <tr id="SEG-006"><td class="req-id">SEG-006</td><td class="req-text">A API deve recusar com status 403 a simulação de diagrama com mais de <span class="tbr">15 [TBR]</span> componentes vinda de conta do plano gratuito.<span class="why">Por quê: diagramas maiores são um recurso do Plano Pro.</span></td><td><span class="vm">T</span></td><td><span class="pill no">Não atendido</span></td></tr>
+            <tr id="SEG-007"><td class="req-id">SEG-007</td><td class="req-text">A API deveria devolver o resultado de uma simulação em até <span class="tbr">300 ms [TBR]</span>, medidos no cliente, em 95% das chamadas em produção.<span class="why">Meta, não requisito. Por quê: inclui a rede, que o requisito DES-001 não cobre.</span></td><td><span class="vm">T</span></td><td><span class="pill partial">Parcial</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="prose"><p>SEG-007 conta como parcial porque não foi medido em produção. O servidor ainda não está no ar.</p></div>
+    </section>
+
+    <section id="pendencias" aria-labelledby="pendencias-t">
+      <h2 id="pendencias-t">Valores a confirmar</h2>
+      <div class="prose"><p>Estes números estão escritos para o requisito poder ser verificado, mas ainda precisam de decisão de produto.</p></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Requisito</th><th scope="col">Valor escrito</th><th scope="col">Quem decide</th></tr></thead>
+          <tbody>
+            <tr><td><a href="#SEG-002">SEG-002</a></td><td>60 simulações por minuto por cliente</td><td>Produto e engenharia</td></tr>
+            <tr><td><a href="#SEG-006">SEG-006</a></td><td>15 componentes no plano gratuito</td><td>Produto</td></tr>
+            <tr><td><a href="#SEG-007">SEG-007</a></td><td>300 ms em 95% das chamadas</td><td>Engenharia</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <footer>
+      Escrito a partir do código em <code>src/server</code> e <code>src/shared/simulation.ts</code>. As fórmulas completas do motor estão no README do repositório.
+    </footer>
+  </main>
+</div>
+
+<script>
+  // Botão de copiar em cada bloco de código. Se o navegador recusar, seleciona o texto para cópia manual.
+  document.querySelectorAll('.code pre').forEach(function (pre) {
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'copy';
+    btn.textContent = 'Copiar';
+    btn.addEventListener('click', function () {
+      var text = pre.innerText;
+      var done = function () { btn.textContent = 'Copiado'; setTimeout(function () { btn.textContent = 'Copiar'; }, 1600); };
+      var fallback = function () {
+        var range = document.createRange();
+        range.selectNodeContents(pre);
+        var sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+        btn.textContent = 'Selecionado';
+      };
+      try {
+        navigator.clipboard.writeText(text).then(done, fallback);
+      } catch (e) {
+        fallback();
+      }
+    });
+    pre.parentElement.appendChild(btn);
+  });
+  // No celular, o índice começa fechado para não empurrar o conteúdo.
+  if (window.matchMedia('(max-width: 959px)').matches) {
+    var toc = document.getElementById('toc-details');
+    if (toc) toc.open = false;
+  }
+</script>

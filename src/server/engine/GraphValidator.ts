@@ -109,6 +109,45 @@ export class GraphValidator {
           componentIds: [c.id],
         });
       }
+      // Modelagem avançada: os campos só valem para o tipo indicado e, se vierem, precisam ser coerentes.
+      if (c.autoscaling !== undefined) {
+        const { maxInstances, targetUtilization } = c.autoscaling;
+        const maxOk = Number.isInteger(maxInstances) && maxInstances >= c.instances && maxInstances <= limits.maxInstances;
+        const targetOk = Number.isFinite(targetUtilization) && targetUtilization > 0 && targetUtilization < 1;
+        if (!maxOk || !targetOk) {
+          issues.push({
+            code: 'INVALID_AUTOSCALING',
+            message: !maxOk
+              ? `${label}: o máximo de instâncias do autoscaling deve ser um inteiro entre o mínimo (${c.instances}) e ${limits.maxInstances}.`
+              : `${label}: a ocupação-alvo do autoscaling deve estar entre 0% e 100% (exclusive).`,
+            componentIds: [c.id],
+          });
+        }
+      }
+      if (c.hitRate !== undefined && !(Number.isFinite(c.hitRate) && c.hitRate >= 0 && c.hitRate <= 1)) {
+        issues.push({
+          code: 'INVALID_HIT_RATE',
+          message: `${label}: a taxa de acerto do cache deve estar entre 0% e 100%.`,
+          componentIds: [c.id],
+        });
+      }
+      if (c.connectionPool !== undefined) {
+        const { size, extraHoldMs } = c.connectionPool;
+        if (!(Number.isInteger(size) && size >= 1 && size <= limits.maxInstances * 100) || !(Number.isFinite(extraHoldMs) && extraHoldMs >= 0 && extraHoldMs <= limits.maxServiceTimeMs)) {
+          issues.push({
+            code: 'INVALID_CONNECTION_POOL',
+            message: `${label}: o pool precisa de pelo menos 1 conexão, e o tempo extra com a conexão deve ser >= 0 ms.`,
+            componentIds: [c.id],
+          });
+        }
+      }
+      if (c.rateLimitRps !== undefined && !(Number.isFinite(c.rateLimitRps) && c.rateLimitRps > 0 && c.rateLimitRps <= limits.maxTrafficRps)) {
+        issues.push({
+          code: 'INVALID_RATE_LIMIT',
+          message: `${label}: o limite de chamadas deve ser maior que 0 e no máximo ${limits.maxTrafficRps} por segundo.`,
+          componentIds: [c.id],
+        });
+      }
       if (!Number.isFinite(c.monthlyCostPerInstance) || c.monthlyCostPerInstance < 0) {
         issues.push({
           code: 'INVALID_COST',

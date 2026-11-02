@@ -270,7 +270,7 @@ function ReportSheet({ report: r }: { report: ExecutiveReport }) {
                   Custo hoje
                 </th>
                 <th scope="col" className="num">
-                  Com o reforço
+                  Em 12 meses
                 </th>
               </tr>
             </thead>

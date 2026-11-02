@@ -57,7 +57,7 @@ export class SimulationEngine {
       source: l.source,
       target: l.target,
       async: l.async,
-      throughputRps: trafficRps * propagation.visits.get(l.source)! * l.callsPerRequest,
+      throughputRps: trafficRps * propagation.visits.get(l.source)! * propagator.passThrough(l.source) * l.callsPerRequest,
     }));
 
     const system = this.systemAnalyzer.analyze(components, propagation, propagator, trafficRps);

@@ -92,6 +92,36 @@ export const GLOSSARY = {
     term: 'Curva do tempo de resposta',
     text: 'Mostra o tempo de resposta para cada volume de acessos. Ele fica quase estável e depois dispara perto da capacidade. Esse ponto de virada é o "joelho" da curva.',
   },
+  advancedModeling: {
+    term: 'Modelagem avançada',
+    text: 'Liga recursos que deixam a conta mais perto da realidade: autoscaling, taxa de acerto do cache, pool de conexões do banco e limite de chamadas de serviços de terceiros. Desligada, o cálculo usa o modelo básico.',
+  },
+  autoscaling: {
+    term: 'Autoscaling',
+    text: 'Liga e desliga instâncias sozinho conforme a carga, entre um mínimo e um máximo, para manter a ocupação perto do alvo. A capacidade passa a ser a do máximo, e o custo, o das instâncias ligadas.',
+    example: 'Com alvo de 60%, uma carga que ocuparia 2 instâncias inteiras liga 4 (2 ÷ 0,6 = 3,3, arredondado para cima).',
+  },
+  autoscalingTarget: {
+    term: 'Ocupação-alvo',
+    text: 'A ocupação que o autoscaling tenta manter. Quando a carga passa dela, ele liga mais instâncias. Um alvo abaixo da ocupação máxima aceitável deixa folga para picos.',
+  },
+  hitRate: {
+    term: 'Taxa de acerto do cache',
+    text: 'A parte das requisições que o cache responde sozinho. Só as faltas seguem pelas ligações que saem do cache, por exemplo até o banco.',
+    example: 'Com 80% de acerto, de 100 requisições só 20 chegam ao banco. Desenhe a ligação do cache até o banco para isso valer.',
+  },
+  connectionPool: {
+    term: 'Pool de conexões',
+    text: 'Quantas conexões o banco aceita ao mesmo tempo. Cada consulta prende uma conexão enquanto roda; sem conexão livre, ela espera. Muitas vezes o pool acaba antes da capacidade do banco.',
+  },
+  connectionHold: {
+    term: 'Tempo extra com a conexão',
+    text: 'Quanto tempo a aplicação segura a conexão além da consulta em si: transações abertas, várias consultas seguidas ou lógica entre elas. Quanto maior, mais conexões ficam presas.',
+  },
+  rateLimit: {
+    term: 'Limite do fornecedor',
+    text: 'Quantas chamadas por segundo o serviço de terceiros aceita no seu plano. Acima disso ele recusa as chamadas (erro 429), e o serviço passa a poder ser o gargalo.',
+  },
 } satisfies Record<string, GlossaryEntry>;
 
 export type GlossaryKey = keyof typeof GLOSSARY;

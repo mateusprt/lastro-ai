@@ -1,4 +1,5 @@
 import type { ComponentResult, SimulationResult } from '../../shared/simulation.js';
+import { remedyFor } from './explain.js';
 import { formatMs, formatMultiplier, formatPercent, formatRps } from './format.js';
 
 export type DiagnosisTone = 'ok' | 'warning' | 'critical';
@@ -36,22 +37,21 @@ export function diagnose(result: SimulationResult): Diagnosis {
 
   if (system.saturated) {
     const saturated = components.filter((c) => c.reachable && c.saturated);
-    const needed = components
-      .filter((c) => c.reachable && c.additionalInstances > 0)
-      .map((c) => `${c.additionalInstances} ${c.additionalInstances === 1 ? 'instância' : 'instâncias'} em ${c.name || 'sem nome'}`);
-    const primaries = components.filter((c) => c.reachable && c.database?.primaryOverSafe).map((c) => c.name || 'sem nome');
-    const add = needed.length > 0 ? ` Para ficar abaixo de ${limit}, adicione ${joinList(needed)}.` : '';
-    const primaryNote =
-      primaries.length > 0
-        ? ` O primário de ${joinList(primaries)} não dá conta das escritas, e mais réplicas não resolvem: ${PRIMARY_WAYS_OUT}.`
-        : '';
+    const remedies = components
+      .filter((c) => c.reachable)
+      .map((c) => [c, remedyFor(c, input.safeUtilization)] as const)
+      .filter((x): x is readonly [ComponentResult, string] => x[1] !== null)
+      .map(([c, r]) => `em ${c.name || 'sem nome'}, ${r}`);
+    const add = remedies.length > 0 ? ` Para ficar abaixo de ${limit}: ${remedies.join('; ')}.` : '';
     return {
       tone: 'critical',
       headline:
         saturated.length === 1
-          ? `${saturated[0]!.name || 'Um componente'} não dá conta de ${formatRps(input.trafficRps)}: a fila cresce sem parar.`
-          : `${saturated.length} componentes não dão conta de ${formatRps(input.trafficRps)}: as filas crescem sem parar.`,
-      detail: `O máximo hoje é ${formatRps(system.maxCapacityRps)}.${add}${primaryNote}`,
+          ? saturated[0]!.rateLimit
+            ? `${saturated[0]!.name || 'Um serviço externo'} recebe mais chamadas do que o limite do fornecedor: as chamadas a mais são recusadas.`
+            : `${saturated[0]!.name || 'Um componente'} não dá conta de ${formatRps(input.trafficRps)}: a fila cresce sem parar.`
+          : `${saturated.length} componentes não dão conta de ${formatRps(input.trafficRps)}.`,
+      detail: `O máximo hoje é ${formatRps(system.maxCapacityRps)}.${add}`,
     };
   }
 
@@ -73,7 +73,7 @@ export function diagnose(result: SimulationResult): Diagnosis {
     return {
       tone: 'critical',
       headline: `${name} está acima da ocupação aceitável, a ${formatPercent(b.utilization)} de ocupação.`,
-      detail: `O tempo de resposta já é de ${formatMs(system.responseTimeMs)}. Com ${b.requiredInstances} instâncias, ${name} volta para baixo de ${limit}.`,
+      detail: `O tempo de resposta já é de ${formatMs(system.responseTimeMs)}.${remedyText(b, input.safeUtilization, limit)}`,
     };
   }
 
@@ -99,7 +99,7 @@ function bottleneckLabel(b: ComponentResult, limitedBy: 'primary' | 'replicas' |
   return b.database!.replicas!.servers === 1 ? `O gargalo é a réplica de ${name}` : `O gargalo são as réplicas de ${name}`;
 }
 
-function joinList(items: string[]): string {
-  if (items.length <= 1) return items[0] ?? 'instâncias';
-  return `${items.slice(0, -1).join(', ')} e ${items.at(-1)}`;
+function remedyText(c: ComponentResult, safeUtilization: number, limit: string): string {
+  const r = remedyFor(c, safeUtilization);
+  return r ? ` Para voltar para baixo de ${limit}, ${r}.` : '';
 }

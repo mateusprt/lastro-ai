@@ -44,6 +44,7 @@ export interface EditorState extends DiagramDoc {
   setName: (name: string) => void;
   setTraffic: (rps: number) => void;
   setSafeUtilization: (u: number) => void;
+  setAdvancedModeling: (on: boolean) => void;
 
   loadDoc: (doc: DiagramDoc, opts?: { resetHistory?: boolean }) => void;
   undo: () => void;
@@ -57,6 +58,8 @@ export function snapshot(s: DiagramDoc): DiagramDoc {
     entryPointId: s.entryPointId,
     trafficRps: s.trafficRps,
     safeUtilization: s.safeUtilization,
+    // Rascunhos antigos não têm o campo.
+    advancedModeling: s.advancedModeling ?? false,
     nodes: s.nodes.map(({ selected: _s, dragging: _d, ...n }) => ({ ...n, data: { ...n.data } })),
     edges: s.edges.map(({ selected: _s, ...e }) => ({ ...e, ...(e.data ? { data: { ...e.data } } : {}) })),
   };
@@ -228,6 +231,11 @@ export const useEditor = create<EditorState>()((set, get) => {
     setSafeUtilization: (u) => {
       record('safe');
       set({ safeUtilization: u });
+    },
+
+    setAdvancedModeling: (on) => {
+      record();
+      set({ advancedModeling: on });
     },
 
     loadDoc: (doc, { resetHistory = false } = {}) => {

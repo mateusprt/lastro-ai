@@ -1,14 +1,20 @@
 import { QueueModel, type QueueMetrics } from './QueueModel.js';
 import {
   DEFAULT_WRITE_FRACTION,
+  type AutoscalingSpec,
   type ComponentResult,
   type ComponentSpec,
   type ComponentStatus,
+  type ConnectionPoolResult,
+  type ConnectionPoolSpec,
   type DatabaseQueueResult,
 } from './types.js';
 
 /** Fração do limite seguro a partir da qual o componente entra em "atenção". */
 export const WARNING_RATIO = 0.75;
+
+/** Folga relativa abaixo da qual o pool de conexões não conta como limite do banco. */
+const POOL_MARGIN = 1e-3;
 
 export interface ComponentLoad {
   visits: number;
@@ -35,10 +41,16 @@ interface DatabaseQueues {
  * - Vazão: X = λ × visitas.
  * - Utilização (Lei da Utilização): U = X × S / c.
  * - Tempo de resposta por visita: fila M/M/c (Erlang C).
- * - Serviço externo: latência fixa, sem fila, sem utilização.
+ * - Serviço externo: latência fixa, sem fila. Com limite de chamadas L, a
+ *   ocupação é X ÷ L e, a partir de 100%, o fornecedor recusa as chamadas.
  * - Banco com mais de uma instância: duas filas. O primário (M/M/1) recebe só
  *   as escritas, X × w; as réplicas (M/M/c com c = instâncias − 1) recebem só
  *   as leituras, X × (1 − w). O tempo por visita é a média ponderada das duas.
+ * - Pool de conexões: cada consulta prende uma conexão por H = R do banco +
+ *   tempo extra. As conexões são uma fila M/M/P com serviço H; a espera por
+ *   conexão soma no tempo de resposta.
+ * - Autoscaling (app e worker): c = ⌈a ÷ alvo⌉, entre o mínimo e o máximo.
+ * - Cache com taxa de acerto: as faltas seguem pelas ligações (TrafficPropagator).
  */
 export class ComponentAnalyzer {
   analyze(
@@ -47,12 +59,7 @@ export class ComponentAnalyzer {
     entryRps: number,
     safeUtilization: number,
   ): ComponentResult {
-    const S = component.serviceTimeMs / 1000;
-    const c = component.instances;
     const throughputRps = entryRps * load.visits;
-    const serviceDemandMs = load.visits * component.serviceTimeMs;
-    const monthlyCost = c * component.monthlyCostPerInstance;
-
     const base: ComponentBase = {
       id: component.id,
       name: component.name,
@@ -61,50 +68,17 @@ export class ComponentAnalyzer {
       visits: load.visits,
       syncVisits: load.syncVisits,
       throughputRps,
-      serviceDemandMs,
-      instances: c,
-      monthlyCost,
+      serviceDemandMs: load.visits * component.serviceTimeMs,
+      instances: component.instances,
+      monthlyCost: component.instances * component.monthlyCostPerInstance,
     };
 
-    if (component.type === 'external') {
-      return {
-        ...base,
-        utilization: 0,
-        saturated: false,
-        waitProbability: 0,
-        waitTimeMs: 0,
-        responseTimeMs: component.serviceTimeMs,
-        status: 'ok',
-        requiredInstances: c,
-        additionalInstances: 0,
-        extraMonthlyCost: 0,
-        maxEntryRps: null,
-        safeEntryRps: null,
-      };
-    }
-
+    if (component.type === 'external') return analyzeExternal(component, base, safeUtilization);
     if (component.type === 'database') {
-      return this.analyzeDatabase(component, base, entryRps, safeUtilization);
+      const db = this.analyzeDatabase(component, base, entryRps, safeUtilization);
+      return component.connectionPool ? withConnectionPool(component, component.connectionPool, db, entryRps, safeUtilization) : db;
     }
-
-    const q = QueueModel.analyze(throughputRps, S, c);
-    const required = Math.max(c, QueueModel.requiredServers(q.offeredLoad, safeUtilization));
-    const maxEntryRps = maxEntryFor((load.visits * S) / c);
-
-    return {
-      ...base,
-      utilization: q.utilization,
-      saturated: q.saturated,
-      waitProbability: q.waitProbability,
-      waitTimeMs: q.saturated ? null : q.waitTimeS * 1000,
-      responseTimeMs: q.saturated ? null : q.responseTimeS * 1000,
-      status: statusFor(q.utilization, safeUtilization),
-      requiredInstances: required,
-      additionalInstances: required - c,
-      extraMonthlyCost: (required - c) * component.monthlyCostPerInstance,
-      maxEntryRps,
-      safeEntryRps: maxEntryRps === null ? null : maxEntryRps * safeUtilization,
-    };
+    return analyzeQueued(component, base, safeUtilization);
   }
 
   /**
@@ -113,11 +87,18 @@ export class ComponentAnalyzer {
    */
   responseTimeS(component: ComponentSpec, visits: number, entryRps: number): number {
     const S = component.serviceTimeMs / 1000;
-    if (component.type === 'external') return S;
-    if (component.type === 'database') {
-      return databaseResponseS(databaseQueues(component, entryRps * visits));
+    const X = entryRps * visits;
+    if (component.type === 'external') {
+      return component.rateLimitRps !== undefined && X >= component.rateLimitRps ? Infinity : S;
     }
-    return QueueModel.analyze(entryRps * visits, S, component.instances).responseTimeS;
+    if (component.type === 'database') {
+      const dbS = databaseResponseS(databaseQueues(component, X));
+      const pool = component.connectionPool;
+      if (!pool || !Number.isFinite(dbS)) return dbS;
+      const q = QueueModel.analyze(X, dbS + pool.extraHoldMs / 1000, pool.size);
+      return q.saturated ? Infinity : dbS + q.waitTimeS;
+    }
+    return QueueModel.analyze(X, S, serversFor(component, X * S)).responseTimeS;
   }
 
   private analyzeDatabase(
@@ -197,6 +178,170 @@ export function statusFor(utilization: number, safeUtilization: number): Compone
   return 'ok';
 }
 
+/** Fila M/M/c comum (balanceador, aplicação, cache, fila, worker), com autoscaling opcional. */
+function analyzeQueued(component: ComponentSpec, base: ComponentBase, safeUtilization: number): ComponentResult {
+  const S = component.serviceTimeMs / 1000;
+  const X = base.throughputRps;
+  const a = X * S;
+  const auto = autoscalingOf(component);
+  const c = serversFor(component, a);
+  const q = QueueModel.analyze(X, S, c);
+  const required = Math.max(c, QueueModel.requiredServers(a, safeUtilization));
+  // Com autoscaling, a capacidade é a do máximo de instâncias.
+  const maxEntryRps = maxEntryFor((base.visits * S) / (auto?.maxInstances ?? c));
+
+  return {
+    ...base,
+    instances: c,
+    monthlyCost: c * component.monthlyCostPerInstance,
+    utilization: q.utilization,
+    saturated: q.saturated,
+    waitProbability: q.waitProbability,
+    waitTimeMs: q.saturated ? null : q.waitTimeS * 1000,
+    responseTimeMs: q.saturated ? null : q.responseTimeS * 1000,
+    status: statusFor(q.utilization, safeUtilization),
+    requiredInstances: required,
+    additionalInstances: required - c,
+    extraMonthlyCost: (required - c) * component.monthlyCostPerInstance,
+    maxEntryRps,
+    safeEntryRps: maxEntryRps === null ? null : maxEntryRps * safeUtilization,
+    ...(auto
+      ? {
+          autoscaling: {
+            minInstances: component.instances,
+            maxInstances: auto.maxInstances,
+            targetUtilization: auto.targetUtilization,
+            activeInstances: c,
+            atMax: c === auto.maxInstances && QueueModel.requiredServers(a, auto.targetUtilization) > c,
+            requiredMaxInstances: Math.max(auto.maxInstances, required),
+          },
+        }
+      : {}),
+    ...(component.type === 'cache' && component.hitRate !== undefined
+      ? { cache: { hitRate: component.hitRate, hitsRps: X * component.hitRate, missesRps: X * (1 - component.hitRate) } }
+      : {}),
+  };
+}
+
+function analyzeExternal(component: ComponentSpec, base: ComponentBase, safeUtilization: number): ComponentResult {
+  const unlimited = {
+    ...base,
+    utilization: 0,
+    saturated: false,
+    waitProbability: 0,
+    waitTimeMs: 0,
+    responseTimeMs: component.serviceTimeMs,
+    status: 'ok' as const,
+    requiredInstances: component.instances,
+    additionalInstances: 0,
+    extraMonthlyCost: 0,
+    maxEntryRps: null,
+    safeEntryRps: null,
+  };
+  const L = component.rateLimitRps;
+  if (L === undefined) return unlimited;
+
+  const X = base.throughputRps;
+  const utilization = X / L;
+  const saturated = X >= L;
+  const maxEntryRps = base.visits > 0 ? L / base.visits : null;
+  return {
+    ...unlimited,
+    utilization,
+    saturated,
+    // Acima do limite o fornecedor recusa as chamadas: não há tempo de resposta válido.
+    responseTimeMs: saturated ? null : component.serviceTimeMs,
+    waitTimeMs: saturated ? null : 0,
+    status: statusFor(utilization, safeUtilization),
+    maxEntryRps,
+    safeEntryRps: maxEntryRps === null ? null : maxEntryRps * safeUtilization,
+    rateLimit: { limitRps: L, utilization, requiredLimitRps: X / safeUtilization },
+  };
+}
+
+/**
+ * Soma o pool de conexões ao resultado do banco. O pool é uma segunda fila,
+ * M/M/P, em que cada consulta ocupa uma conexão por H = R do banco + tempo
+ * extra. Como H cresce com a carga, as capacidades do pool saem por bisseção.
+ */
+function withConnectionPool(
+  component: ComponentSpec,
+  pool: ConnectionPoolSpec,
+  db: ComponentResult,
+  entryRps: number,
+  safeUtilization: number,
+): ComponentResult {
+  const extraS = pool.extraHoldMs / 1000;
+  const visits = db.visits;
+  const X = db.throughputRps;
+  // Conexões em uso para um tráfego de entrada e (Lei de Little): X × H.
+  const inUseAt = (e: number) => e * visits * (databaseResponseS(databaseQueues(component, e * visits)) + extraS);
+  const poolMax = db.maxEntryRps === null ? null : solveIncreasing(inUseAt, pool.size, db.maxEntryRps);
+  const poolSafe = db.maxEntryRps === null ? null : solveIncreasing(inUseAt, pool.size * safeUtilization, db.maxEntryRps);
+  // Perto da saturação do banco o tempo de resposta vai a infinito, e com ele as
+  // conexões em uso: todo pool finito esgota um instante antes do banco. Só conta
+  // como limite quando trava de fato antes (0,1% ou mais).
+  const limiting = poolMax !== null && db.maxEntryRps !== null && poolMax < db.maxEntryRps * (1 - POOL_MARGIN);
+
+  if (db.responseTimeMs === null) {
+    const result: ConnectionPoolResult = {
+      size: pool.size,
+      extraHoldMs: pool.extraHoldMs,
+      inUse: null,
+      utilization: null,
+      saturated: true,
+      status: 'critical',
+      waitTimeMs: null,
+      maxEntryRps: poolMax,
+      requiredSize: null,
+      limiting,
+    };
+    return { ...db, connectionPool: result };
+  }
+
+  const holdS = db.responseTimeMs / 1000 + extraS;
+  const q = QueueModel.analyze(X, holdS, pool.size);
+  const utilization = Math.max(db.utilization, q.utilization);
+  const saturated = db.saturated || q.saturated;
+  const maxEntryRps = limiting ? poolMax : db.maxEntryRps;
+
+  return {
+    ...db,
+    utilization,
+    saturated,
+    waitTimeMs: saturated ? null : db.waitTimeMs! + q.waitTimeS * 1000,
+    responseTimeMs: saturated ? null : db.responseTimeMs + q.waitTimeS * 1000,
+    status: statusFor(utilization, safeUtilization),
+    maxEntryRps,
+    safeEntryRps: poolSafe !== null && db.safeEntryRps !== null && poolSafe < db.safeEntryRps * (1 - POOL_MARGIN) ? poolSafe : db.safeEntryRps,
+    connectionPool: {
+      size: pool.size,
+      extraHoldMs: pool.extraHoldMs,
+      inUse: q.offeredLoad,
+      utilization: q.utilization,
+      saturated: q.saturated,
+      status: statusFor(q.utilization, safeUtilization),
+      waitTimeMs: q.saturated ? null : q.waitTimeS * 1000,
+      maxEntryRps: poolMax,
+      requiredSize: Math.max(pool.size, QueueModel.requiredServers(q.offeredLoad, safeUtilization)),
+      limiting,
+    },
+  };
+}
+
+/** Autoscaling só vale para aplicação e worker. */
+function autoscalingOf(component: ComponentSpec): AutoscalingSpec | null {
+  return component.autoscaling && (component.type === 'app' || component.type === 'worker') ? component.autoscaling : null;
+}
+
+/** Servidores ligados para uma carga oferecida `a`: fixos, ou o que o autoscaling ligaria. */
+function serversFor(component: ComponentSpec, a: number): number {
+  const auto = autoscalingOf(component);
+  if (!auto) return component.instances;
+  const wanted = QueueModel.requiredServers(a, auto.targetUtilization);
+  return Math.min(auto.maxInstances, Math.max(component.instances, wanted));
+}
+
 function databaseQueues(component: ComponentSpec, throughputRps: number): DatabaseQueues {
   const S = component.serviceTimeMs / 1000;
   const writeFraction = component.writeFraction ?? DEFAULT_WRITE_FRACTION;
@@ -236,6 +381,21 @@ function queueResult(
     maxEntryRps,
     safeEntryRps: maxEntryRps === null ? null : maxEntryRps * safeUtilization,
   };
+}
+
+/**
+ * Menor x em [0, upper) com f(x) >= target, para f crescente que vai a
+ * infinito perto de `upper`. Devolve `upper` se f não chega ao alvo antes.
+ */
+function solveIncreasing(f: (x: number) => number, target: number, upper: number): number {
+  let lo = 0;
+  let hi = upper;
+  for (let i = 0; i < 100 && hi - lo > upper * 1e-13; i++) {
+    const mid = (lo + hi) / 2;
+    if (f(mid) >= target) hi = mid;
+    else lo = mid;
+  }
+  return (lo + hi) / 2;
 }
 
 /** Tráfego de entrada que leva uma fila a 100%, dada a demanda por servidor em segundos. */

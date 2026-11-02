@@ -1,0 +1,337 @@
+<title>Aprovação do Lastro</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&display=swap">
+<style>
+  /* Layout: um memorando de decisão em coluna única, com o resumo e a decisão logo no começo. */
+  :root {
+    --paper: #e8eef2;
+    --surface: #ffffff;
+    --surface-2: #f3f7f9;
+    --ink: #102a43;
+    --ink-2: #3e5a75;
+    --muted: #5f7891;
+    --line: #d2dce4;
+    --line-strong: #9fb3c6;
+    --accent: #0b5cad;
+    --accent-soft: #dbe8f6;
+    --good-ink: #08700a;
+    --good-soft: #e3f4e3;
+    --warning-ink: #8a5a00;
+    --warning-soft: #fdf1d6;
+    --critical-ink: #b42828;
+    --critical-soft: #fbe4e4;
+    --font: 'Hanken Grotesk', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --radius: 10px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #0b1620; --surface: #12212e; --surface-2: #172a39; --ink: #e3ebf2; --ink-2: #b4c4d2; --muted: #8ba1b5;
+      --line: #23384a; --line-strong: #3e5669; --accent: #5ca8f2; --accent-soft: #15314c;
+      --good-ink: #5fd35f; --good-soft: #12301a; --warning-ink: #f7c04d; --warning-soft: #352710; --critical-ink: #f17c7c; --critical-soft: #3a1818;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #0b1620; --surface: #12212e; --surface-2: #172a39; --ink: #e3ebf2; --ink-2: #b4c4d2; --muted: #8ba1b5;
+    --line: #23384a; --line-strong: #3e5669; --accent: #5ca8f2; --accent-soft: #15314c;
+    --good-ink: #5fd35f; --good-soft: #12301a; --warning-ink: #f7c04d; --warning-soft: #352710; --critical-ink: #f17c7c; --critical-soft: #3a1818;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font);
+    font-size: 17px;
+    line-height: 1.6;
+    font-variant-numeric: tabular-nums;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  h1, h2, h3 { text-wrap: balance; line-height: 1.2; margin: 0; }
+  p { margin: 0; }
+  a { color: var(--accent); text-underline-offset: 3px; }
+  a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+
+  .page { max-width: 860px; margin: 0 auto; padding-block: 40px 72px; display: grid; gap: 56px; }
+  section { display: grid; gap: 16px; min-width: 0; }
+  section > h2 { font-size: 26px; font-weight: 800; letter-spacing: -0.015em; }
+  section h3 { font-size: 18px; font-weight: 700; margin-top: 8px; }
+  .prose { max-width: 66ch; display: grid; gap: 12px; color: var(--ink); }
+  .prose ul, .prose ol { margin: 0; padding-left: 22px; display: grid; gap: 8px; }
+
+  /* Cabeçalho */
+  .head { display: grid; gap: 14px; padding-bottom: 28px; border-bottom: 2px solid var(--ink); }
+  .eyebrow { font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+  .head h1 { font-size: clamp(34px, 6vw, 52px); font-weight: 800; letter-spacing: -0.03em; }
+  .lede { font-size: 20px; line-height: 1.5; color: var(--ink-2); max-width: 60ch; }
+
+  /* Resumo: três respostas curtas */
+  .summary { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
+  @media (min-width: 720px) { .summary { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  .answer { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 18px 20px; display: grid; gap: 8px; align-content: start; }
+  .answer .q { font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+  .answer .a { font-size: 17px; line-height: 1.45; }
+  .answer strong { font-weight: 700; }
+
+  .ask { background: var(--accent-soft); border-left: 5px solid var(--accent); border-radius: 0 var(--radius) var(--radius) 0; padding: 18px 20px; display: grid; gap: 8px; max-width: 72ch; }
+  .ask p:first-child { font-weight: 800; font-size: 19px; }
+
+  /* Exemplo com números reais */
+  .example { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; display: grid; gap: 14px; }
+  .example-numbers { display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; grid-template-columns: minmax(0, 1fr); }
+  @media (min-width: 640px) { .example-numbers { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  .example-numbers div { background: var(--surface); padding: 12px 14px; display: grid; gap: 2px; }
+  .example-numbers dt { font-size: 13px; color: var(--muted); font-weight: 600; }
+  .example-numbers dd { margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.01em; }
+  .example-numbers dd small { display: block; font-size: 13px; font-weight: 500; color: var(--ink-2); letter-spacing: 0; }
+  .small { font-size: 14px; color: var(--muted); }
+
+  /* Listas pronto / falta */
+  .two { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
+  @media (min-width: 720px) { .two { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .col { display: grid; gap: 10px; align-content: start; }
+  .col ul { margin: 0; padding-left: 22px; display: grid; gap: 8px; }
+
+  /* Requisitos */
+  .status-tally { display: flex; flex-wrap: wrap; gap: 8px; }
+  .pill { display: inline-block; white-space: nowrap; font-size: 13px; font-weight: 700; padding: 3px 10px; border-radius: 99px; }
+  .pill.ok { color: var(--good-ink); background: var(--good-soft); }
+  .pill.partial { color: var(--warning-ink); background: var(--warning-soft); }
+  .pill.no { color: var(--critical-ink); background: var(--critical-soft); }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 15px; }
+  th, td { text-align: left; vertical-align: top; padding: 11px 14px; border-bottom: 1px solid var(--line); }
+  thead th { background: var(--surface-2); font-size: 13px; font-weight: 700; color: var(--ink-2); white-space: nowrap; }
+  tbody tr:last-child > * { border-bottom: 0; }
+  .rid { font-weight: 700; white-space: nowrap; color: var(--ink-2); }
+  .rtext { min-width: 260px; }
+  .rtext .why { display: block; margin-top: 4px; font-size: 14px; color: var(--muted); }
+  .how { min-width: 150px; font-size: 14px; color: var(--ink-2); }
+  .tbd { font-weight: 700; color: var(--warning-ink); white-space: nowrap; }
+
+  /* Riscos */
+  .risks { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+  .risks li { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; display: grid; gap: 4px; }
+  .risks strong { font-weight: 700; }
+  .risks span { color: var(--ink-2); font-size: 15px; }
+
+  /* Opções de decisão */
+  .options { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+  .options li { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; display: grid; gap: 6px; }
+  .options li.recommended { border: 2px solid var(--accent); }
+  .opt-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; }
+  .opt-head strong { font-size: 18px; }
+  .tag { font-size: 12px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; color: var(--accent); }
+
+  dl.glossary { margin: 0; display: grid; gap: 12px; }
+  dl.glossary dt { font-weight: 700; }
+  dl.glossary dd { margin: 2px 0 0; color: var(--ink-2); max-width: 66ch; }
+
+  footer { color: var(--muted); font-size: 14px; border-top: 1px solid var(--line); padding-top: 16px; max-width: 70ch; }
+</style>
+
+<div class="page">
+  <header class="head">
+    <p class="eyebrow">Para decisão da diretoria · 2 de novembro de 2026</p>
+    <h1>Aprovação do Lastro</h1>
+    <p class="lede">O Lastro mostra, antes de acontecer, quando o sistema de uma empresa vai ficar lento ou cair por excesso de clientes, e quanto custa evitar isso. Este documento explica o que já está pronto, o que falta e o que a equipe pede para seguir.</p>
+  </header>
+
+  <section aria-labelledby="resumo-t">
+    <h2 id="resumo-t">Em resumo</h2>
+    <div class="summary">
+      <div class="answer">
+        <p class="q">O que é</p>
+        <p class="a">Uma ferramenta na internet. A pessoa desenha as partes do sistema e descobre <strong>qual delas trava primeiro</strong> e <strong>quanto custa reforçar</strong>.</p>
+      </div>
+      <div class="answer">
+        <p class="q">Onde estamos</p>
+        <p class="a">O produto funciona e pode ser testado pela equipe. Ainda <strong>não está aberto ao público</strong>: faltam login, salvar o trabalho e proteção contra abuso.</p>
+      </div>
+      <div class="answer">
+        <p class="q">O que pedimos</p>
+        <p class="a">Aprovar a <strong>preparação para o lançamento</strong>: os 6 itens que faltam, depois de a equipe apresentar custo e prazo.</p>
+      </div>
+    </div>
+    <div class="ask">
+      <p>A decisão: aprovar ou não a preparação para o lançamento.</p>
+      <p>As opções e o que muda em cada uma estão em <a href="#decisao">O que decidir</a>. Dos 16 requisitos, 7 estão prontos, 3 estão em parte e 6 faltam fazer.</p>
+    </div>
+  </section>
+
+  <section aria-labelledby="problema-t">
+    <h2 id="problema-t">O problema</h2>
+    <div class="prose">
+      <p>Quando chegam mais clientes do que o sistema aguenta, o site fica lento ou sai do ar. Isso costuma acontecer justamente nos dias que mais importam, como uma promoção ou a Black Friday.</p>
+      <p>Para saber o limite antes, a equipe técnica precisa de um teste de carga: montar um ambiente parecido com o real e gerar acessos falsos em grande volume. Isso leva tempo e custa caro, então muitas empresas só descobrem o limite quando o site cai.</p>
+    </div>
+  </section>
+
+  <section aria-labelledby="solucao-t">
+    <h2 id="solucao-t">O que o Lastro faz</h2>
+    <div class="prose">
+      <ol>
+        <li>A pessoa desenha as partes do sistema (o site, o banco de dados, os serviços de outras empresas) e diz quem chama quem. Também pode começar por um modelo pronto.</li>
+        <li>Informa quantos acessos chegam por segundo.</li>
+        <li>O Lastro calcula, na hora, qual parte trava primeiro, a partir de quantos acessos isso acontece e quantas máquinas a mais resolvem.</li>
+        <li>O relatório executivo diz o mês em que o sistema deve travar, compara cenários e mostra o custo para aguentar os próximos 12 meses.</li>
+      </ol>
+      <p>A conta usa um método conhecido da engenharia, a teoria das filas. Ela não substitui um teste de carga, mas dá a resposta em segundos e sem montar nada.</p>
+    </div>
+
+    <div class="example">
+      <h3>Exemplo com o modelo de loja virtual que vem no produto</h3>
+      <dl class="example-numbers">
+        <div><dt>Parte que trava primeiro</dt><dd>Banco de dados<small>com 100 acessos por segundo hoje</small></dd></div>
+        <div><dt>Quando trava</dt><dd>Em cerca de 12 meses<small>se os acessos crescerem 5% ao mês</small></dd></div>
+        <div><dt>Custo para aguentar 12 meses</dt><dd>+R$ 2.250 por mês<small>de R$ 6.500 para R$ 8.750</small></dd></div>
+      </dl>
+      <p class="small">Números calculados pelo Lastro com os valores de exemplo do modelo. Num cliente real, eles dependem do que o cliente informar.</p>
+    </div>
+  </section>
+
+  <section aria-labelledby="estado-t">
+    <h2 id="estado-t">Onde estamos</h2>
+    <div class="two">
+      <div class="col">
+        <h3>Pronto</h3>
+        <ul>
+          <li>Desenhar o sistema e ver o resultado a cada mudança.</li>
+          <li>Ver o gargalo, o limite de acessos e as máquinas que faltam.</li>
+          <li>Relatório executivo com data de travamento, cenários, recomendação e custo.</li>
+          <li>Recursos avançados para sistemas maiores, como ligar máquinas sozinho conforme a demanda.</li>
+          <li>Explicações dos termos dentro da tela, para quem não é da área.</li>
+        </ul>
+      </div>
+      <div class="col">
+        <h3>Falta antes de abrir ao público</h3>
+        <ul>
+          <li>Login e contas de usuário.</li>
+          <li>Guardar os diagramas no servidor. Hoje ficam só no navegador da pessoa.</li>
+          <li>Bloquear quem usar o serviço em excesso.</li>
+          <li>Limite do plano gratuito e cobrança do Plano Pro.</li>
+          <li>Guardar a lista de espera do Plano Pro sem perder inscrições.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="prose">
+      <p>O relatório executivo e o custo estão abertos a todos enquanto a equipe testa. Depois do lançamento, eles passam para o Plano Pro, que é pago.</p>
+    </div>
+  </section>
+
+  <section aria-labelledby="req-t">
+    <h2 id="req-t">Requisitos</h2>
+    <div class="prose">
+      <p>Cada requisito diz uma coisa que o Lastro <strong>deve</strong> fazer, de um jeito que dá para conferir. “Deve” quer dizer obrigatório. A coluna “Como conferimos” diz como a equipe prova que o requisito foi cumprido.</p>
+      <p>Seguimos as regras do manual de engenharia de sistemas da NASA: um requisito por frase, com número próprio, um motivo e uma forma de conferir. Valores ainda não decididos aparecem como <span class="tbd">[a definir]</span>.</p>
+    </div>
+    <div class="status-tally" aria-label="Situação dos requisitos">
+      <span class="pill ok">7 prontos</span>
+      <span class="pill partial">3 em parte</span>
+      <span class="pill no">6 faltam</span>
+    </div>
+
+    <h3>Para quem usa</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th scope="col">Nº</th><th scope="col">O Lastro deve…</th><th scope="col">Como conferimos</th><th scope="col">Situação</th></tr></thead>
+        <tbody>
+          <tr><td class="rid">N-01</td><td class="rtext">mostrar qual parte trava primeiro em qualquer diagrama de até 200 partes.<span class="why">É a pergunta principal que o cliente traz.</span></td><td class="how">Testes automáticos</td><td><span class="pill ok">Pronto</span></td></tr>
+          <tr><td class="rid">N-02</td><td class="rtext">mostrar o resultado novo em até 1 segundo depois que a pessoa para de mexer no diagrama.<span class="why">A pessoa precisa ver o efeito de cada mudança na hora.</span></td><td class="how">Medição: o cálculo leva menos de 0,01 segundo. Falta medir com o servidor no ar.</td><td><span class="pill partial">Em parte</span></td></tr>
+          <tr><td class="rid">N-03</td><td class="rtext">informar quantas máquinas a mais cada parte precisa para aguentar os acessos informados.<span class="why">Transforma o problema numa ação concreta.</span></td><td class="how">Testes automáticos</td><td><span class="pill ok">Pronto</span></td></tr>
+          <tr><td class="rid">N-04</td><td class="rtext">estimar o mês em que o sistema trava, a partir do crescimento mensal informado.<span class="why">Diz quanto tempo a empresa tem para agir.</span></td><td class="how">Conta conferida à mão</td><td><span class="pill ok">Pronto</span></td></tr>
+          <tr><td class="rid">N-05</td><td class="rtext">comparar 5 cenários: hoje, daqui a 6 meses, daqui a 12 meses, um pico de 3 vezes e 12 meses com o reforço.<span class="why">Mostra o risco no tempo e num dia de pico.</span></td><td class="how">Conta conferida à mão</td><td><span class="pill ok">Pronto</span></td></tr>
+          <tr><td class="rid">N-06</td><td class="rtext">mostrar o custo mensal de hoje e o custo para aguentar os próximos 12 meses.<span class="why">É o número que a gestão do cliente precisa para aprovar o reforço.</span></td><td class="how">Conta conferida à mão</td><td><span class="pill ok">Pronto</span></td></tr>
+          <tr><td class="rid">N-07</td><td class="rtext">gerar o relatório executivo em PDF.<span class="why">O cliente leva o relatório para a própria diretoria.</span></td><td class="how">Feito pela impressão do navegador. Falta conferir o arquivo gerado.</td><td><span class="pill partial">Em parte</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Confiança no resultado</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th scope="col">Nº</th><th scope="col">O Lastro deve…</th><th scope="col">Como conferimos</th><th scope="col">Situação</th></tr></thead>
+        <tbody>
+          <tr><td class="rid">N-08</td><td class="rtext">dar sempre o mesmo resultado para o mesmo diagrama.<span class="why">Duas pessoas olhando o mesmo diagrama precisam ver os mesmos números.</span></td><td class="how">Revisão do código</td><td><span class="pill ok">Pronto</span></td></tr>
+          <tr><td class="rid">N-09</td><td class="rtext">dizer em cada relatório o que o cálculo não considera.<span class="why">Evita que o cliente tome a estimativa como certeza.</span></td><td class="how">Revisão do relatório</td><td><span class="pill ok">Pronto</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Segurança e dados</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th scope="col">Nº</th><th scope="col">O Lastro deve…</th><th scope="col">Como conferimos</th><th scope="col">Situação</th></tr></thead>
+        <tbody>
+          <tr><td class="rid">N-10</td><td class="rtext">exigir login antes de calcular ou guardar diagramas.<span class="why">Sem login, qualquer pessoa usa o servidor, e não há como saber quem é cliente.</span></td><td class="how">Testes automáticos, quando estiver feito</td><td><span class="pill no">Falta</span></td></tr>
+          <tr><td class="rid">N-11</td><td class="rtext">guardar os diagramas no servidor, para a pessoa abrir o trabalho em outro computador.<span class="why">Hoje o trabalho fica só no navegador e some se a pessoa limpar os dados dele.</span></td><td class="how">Testes automáticos, quando estiver feito</td><td><span class="pill no">Falta</span></td></tr>
+          <tr><td class="rid">N-12</td><td class="rtext">bloquear quem fizer mais de <span class="tbd">60 cálculos por minuto [a definir]</span>.<span class="why">Impede que uma pessoa sozinha derrube o serviço para os outros.</span></td><td class="how">Testes automáticos, quando estiver feito</td><td><span class="pill no">Falta</span></td></tr>
+          <tr><td class="rid">N-13</td><td class="rtext">avisar a equipe de todo erro inesperado no servidor.<span class="why">A equipe precisa saber do problema antes de o cliente reclamar. Hoje o erro fica registrado só no próprio servidor.</span></td><td class="how">Revisão do código</td><td><span class="pill partial">Em parte</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Negócio</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th scope="col">Nº</th><th scope="col">O Lastro deve…</th><th scope="col">Como conferimos</th><th scope="col">Situação</th></tr></thead>
+        <tbody>
+          <tr><td class="rid">N-14</td><td class="rtext">limitar o plano gratuito a <span class="tbd">15 partes por diagrama [a definir]</span>.<span class="why">Diagramas maiores são um dos motivos para assinar o Plano Pro.</span></td><td class="how">Testes automáticos, quando estiver feito</td><td><span class="pill no">Falta</span></td></tr>
+          <tr><td class="rid">N-15</td><td class="rtext">cobrar a assinatura mensal do Plano Pro, por <span class="tbd">um preço [a definir]</span>.<span class="why">É a fonte de receita do produto.</span></td><td class="how">Demonstração, quando estiver feito</td><td><span class="pill no">Falta</span></td></tr>
+          <tr><td class="rid">N-16</td><td class="rtext">guardar todas as inscrições da lista de espera do Plano Pro, mesmo quando o servidor reinicia.<span class="why">A lista mede o interesse no Plano Pro. Hoje ela se perde a cada atualização do servidor.</span></td><td class="how">Testes automáticos, quando estiver feito</td><td><span class="pill no">Falta</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section aria-labelledby="riscos-t">
+    <h2 id="riscos-t">Riscos</h2>
+    <ul class="risks">
+      <li><strong>O resultado é uma estimativa.</strong><span>Ele não substitui um teste de carga antes de uma decisão grande. O relatório diz isso ao cliente, e lista o que a conta não considera.</span></li>
+      <li><strong>O resultado depende dos números que o cliente informa.</strong><span>Se o cliente errar o tempo de cada parte, a estimativa erra junto. O produto sugere valores e explica cada campo para reduzir esse risco.</span></li>
+      <li><strong>Hoje o trabalho do usuário pode se perder.</strong><span>Os diagramas ficam só no navegador. O requisito N-11 resolve isso.</span></li>
+      <li><strong>O servidor ainda não pode ficar aberto na internet.</strong><span>Sem login e sem bloqueio de abuso, qualquer pessoa pode usar o serviço sem limite. Os requisitos N-10 e N-12 resolvem isso.</span></li>
+      <li><strong>Ainda não sabemos quantas pessoas querem o Plano Pro.</strong><span>A lista de espera existe, mas perde as inscrições quando o servidor reinicia. O requisito N-16 resolve isso.</span></li>
+    </ul>
+  </section>
+
+  <section id="decisao" aria-labelledby="decisao-t">
+    <h2 id="decisao-t">O que decidir</h2>
+    <div class="prose">
+      <p>Antes da decisão final, a equipe técnica precisa estimar o custo e o prazo dos 6 itens que faltam. Esses números ainda não estão neste documento.</p>
+    </div>
+    <ul class="options">
+      <li class="recommended">
+        <div class="opt-head"><strong>A. Aprovar a preparação para o lançamento</strong><span class="tag">Recomendada</span></div>
+        <p>A equipe estima custo e prazo dos 6 itens, a diretoria confirma, e a equipe faz os itens. Depois disso, o Lastro pode abrir ao público.</p>
+      </li>
+      <li>
+        <div class="opt-head"><strong>B. Aprovar só um teste com poucos clientes convidados</strong></div>
+        <p>Mede o interesse mais cedo e com menos gasto. O risco: sem login e sem guardar diagramas, os convidados podem perder o trabalho, e o servidor fica sem proteção. Pede pelo menos o bloqueio de abuso (N-12).</p>
+      </li>
+      <li>
+        <div class="opt-head"><strong>C. Não aprovar agora</strong></div>
+        <p>O produto fica como está, só para a equipe. Nada se gasta, mas também não se mede o interesse dos clientes.</p>
+      </li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="termos-t">
+    <h2 id="termos-t">Termos usados</h2>
+    <dl class="glossary">
+      <div><dt>Gargalo</dt><dd>A parte do sistema que chega ao limite primeiro quando os acessos crescem. Reforçar outra parte não adianta enquanto o gargalo continuar o mesmo.</dd></div>
+      <div><dt>Acessos por segundo</dt><dd>Quantos pedidos chegam ao sistema a cada segundo. Cada clique ou página aberta conta como um ou mais pedidos.</dd></div>
+      <div><dt>Máquina (instância)</dt><dd>Uma cópia de uma parte do sistema rodando num servidor. Mais cópias dividem o trabalho.</dd></div>
+      <div><dt>Teste de carga</dt><dd>Um ensaio que gera muitos acessos falsos contra um sistema parecido com o real, para ver onde ele quebra.</dd></div>
+      <div><dt>Plano Pro</dt><dd>A versão paga do Lastro, com diagramas maiores, cenários e custos.</dd></div>
+    </dl>
+  </section>
+
+  <footer>
+    Preparado pela equipe do Lastro em 2 de novembro de 2026, com base no produto como está hoje. A versão técnica deste documento, para desenvolvedores, descreve a API e 33 requisitos detalhados.
+  </footer>
+</div>

@@ -1,5 +1,5 @@
 import type { ComponentResult, ComponentStatus, ComponentType, SimulationResult } from '../../shared/simulation.js';
-import type { DiagramDoc } from '../store/types.js';
+import type { ComponentData, DiagramDoc } from '../store/types.js';
 import { formatBRL, formatNumber, formatPercent, formatRps } from './format.js';
 
 /**
@@ -61,17 +61,38 @@ export function reinforcedPlan(horizon: ScenarioPlan): ScenarioPlan {
 
 /** Algum componente precisa de mais instâncias no horizonte. */
 export function needsReinforcement(horizon: SimulationResult): boolean {
-  return horizon.components.some((c) => c.reachable && c.additionalInstances > 0);
+  return horizon.components.some((c) => reinforcementFor(c, horizon.input.safeUtilization) !== null);
 }
 
-/** O diagrama com as instâncias recomendadas para o horizonte. */
+/**
+ * O que muda num componente para ele ficar abaixo do limite seguro: mais
+ * instâncias, um máximo de autoscaling maior (ou um alvo menor), um pool maior
+ * ou um limite maior no fornecedor. `null` se nada é necessário ou nada resolve.
+ */
+export function reinforcementFor(c: ComponentResult, safeUtilization: number): Partial<ComponentData> | null {
+  if (!c.reachable) return null;
+  const pool = c.connectionPool;
+  const patch: Partial<ComponentData> = {};
+  if (pool && pool.status === 'critical' && pool.requiredSize !== null && pool.requiredSize > pool.size) patch.poolSize = pool.requiredSize;
+  if (c.rateLimit && c.status === 'critical') patch.rateLimitRps = Math.ceil(c.rateLimit.requiredLimitRps);
+  if (c.autoscaling && c.additionalInstances > 0) {
+    if (c.autoscaling.atMax) patch.autoscalingMax = c.autoscaling.requiredMaxInstances;
+    else patch.autoscalingTarget = safeUtilization;
+  } else if (!c.autoscaling && c.additionalInstances > 0) {
+    patch.instances = c.requiredInstances;
+  }
+  return Object.keys(patch).length > 0 ? patch : null;
+}
+
+/** O diagrama com o reforço recomendado para o horizonte. */
 export function reinforcedDoc(doc: DiagramDoc, horizon: SimulationResult): DiagramDoc {
   const byId = new Map(horizon.components.map((c) => [c.id, c]));
   return {
     ...doc,
     nodes: doc.nodes.map((n) => {
       const r = byId.get(n.id);
-      return r && r.additionalInstances > 0 ? { ...n, data: { ...n.data, instances: r.requiredInstances } } : n;
+      const patch = r ? reinforcementFor(r, horizon.input.safeUtilization) : null;
+      return patch ? { ...n, data: { ...n.data, ...patch } } : n;
     }),
   };
 }
@@ -170,13 +191,16 @@ export function buildExecutiveReport(doc: DiagramDoc, growth: number, results: S
   const safeLimit = projectSaturation(rps, today.system.safeCapacityRps, growth, now);
 
   const costToday = today.system.monthlyCost;
-  const costRecommended = reinforced ? reinforced.system.monthlyCost : costToday;
+  // Daqui a 12 meses, com o reforço se houver. Com autoscaling o custo cresce
+  // junto com os acessos, mesmo sem reforço.
+  const ahead = reinforced ?? horizon;
+  const costRecommended = ahead.system.monthlyCost;
   const extra = costRecommended - costToday;
 
   const scenarios: ScenarioRow[] = plans.map((p) => scenarioRow(p, results[p.key as Exclude<ScenarioKey, 'reinforced'>]));
   if (reinforced) scenarios.push(scenarioRow(reinforcedPlan(plans[2]!), reinforced));
 
-  const reinforcedById = new Map((reinforced ?? today).components.map((c) => [c.id, c]));
+  const reinforcedById = new Map(ahead.components.map((c) => [c.id, c]));
   const costRows: CostRow[] = today.components.map((c) => {
     const r = reinforcedById.get(c.id) ?? c;
     return {
@@ -263,11 +287,14 @@ function summaryFor(
   const primaryBound = horizon.components.some((c) => c.reachable && c.database?.primaryOverSafe);
   let plan: string;
   if (reinforced) {
-    plan = `Para aguentar os próximos ${HORIZON_MONTHS} meses, o reforço recomendado custa ${formatBRL(costRecommended - costToday)} a mais por mês (de ${formatBRL(costToday)} para ${formatBRL(costRecommended)}).`;
+    plan = `Com o reforço recomendado, aguentar os próximos ${HORIZON_MONTHS} meses custa ${formatBRL(costRecommended - costToday)} a mais por mês (de ${formatBRL(costToday)} para ${formatBRL(costRecommended)}).`;
   } else if (primaryBound) {
     plan = `Em ${HORIZON_MONTHS} meses, o primário do banco não dá conta das gravações, e mais instâncias não resolvem.`;
   } else {
-    plan = `A arquitetura atual aguenta os próximos ${HORIZON_MONTHS} meses sem reforço, por ${formatBRL(costToday)} por mês.`;
+    plan =
+      costRecommended > costToday
+        ? `A arquitetura atual aguenta os próximos ${HORIZON_MONTHS} meses sem reforço; com o autoscaling, o custo sobe de ${formatBRL(costToday)} para ${formatBRL(costRecommended)} por mês.`
+        : `A arquitetura atual aguenta os próximos ${HORIZON_MONTHS} meses sem reforço, por ${formatBRL(costToday)} por mês.`;
   }
   if (reinforced && primaryBound) plan += ' Mesmo assim, o primário do banco continua no limite: veja a recomendação.';
   return `${when} ${plan}`;
@@ -287,7 +314,22 @@ function actionsFor(results: ScenarioResults, growth: number): string[] {
       );
       continue;
     }
-    if (c.additionalInstances > 0) {
+    const pool = c.connectionPool;
+    if (pool && pool.status === 'critical' && pool.requiredSize !== null && pool.requiredSize > pool.size) {
+      actions.push(`Aumentar o pool de conexões de ${name} de ${pool.size} para ${pool.requiredSize}. Sem isso, as consultas passam a esperar por uma conexão livre.`);
+    }
+    if (c.rateLimit && c.status === 'critical') {
+      actions.push(
+        `Negociar com o fornecedor de ${name} um limite de ${formatNumber(Math.ceil(c.rateLimit.requiredLimitRps))} chamadas por segundo (hoje são ${formatNumber(c.rateLimit.limitRps)}). Acima do limite, as chamadas são recusadas.`,
+      );
+    }
+    if (c.autoscaling && c.additionalInstances > 0) {
+      actions.push(
+        c.autoscaling.atMax
+          ? `Subir o máximo do autoscaling de ${name} de ${c.autoscaling.maxInstances} para ${c.autoscaling.requiredMaxInstances} instâncias. As instâncias a mais só custam quando estão ligadas.`
+          : `Baixar a ocupação-alvo do autoscaling de ${name} de ${formatPercent(c.autoscaling.targetUtilization)} para até ${limit}, para ele ligar instâncias antes de passar do limite.`,
+      );
+    } else if (c.additionalInstances > 0) {
       const n = c.additionalInstances;
       const what = c.type === 'database' ? (n === 1 ? 'réplica' : 'réplicas') : n === 1 ? 'instância' : 'instâncias';
       actions.push(

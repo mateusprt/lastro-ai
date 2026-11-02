@@ -246,6 +246,23 @@ p {
   filter: brightness(1.08);
   border-color: var(--accent);
 }
+/* Botão liga/desliga: o ponto preenchido e a cor de destaque mostram que está ligado. */
+.btn-switch .switch-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid var(--line-strong);
+  background: transparent;
+}
+.btn-switch.is-on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--ink);
+}
+.btn-switch.is-on .switch-dot {
+  border-color: var(--accent);
+  background: var(--accent);
+}
 .btn-pro {
   border-color: var(--ink);
   color: var(--ink);
@@ -1023,6 +1040,25 @@ p {
   font-size: 12.5px;
   color: var(--muted);
   line-height: 1.4;
+}
+/* Campos da modelagem avançada, agrupados e marcados com a cor de destaque. */
+.props-advanced {
+  margin: 0;
+  padding: 10px 12px 12px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--accent-soft) 45%, var(--surface));
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.props-advanced legend {
+  padding: 0 6px;
+  margin-left: -4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
 }
 .props-warning {
   margin: 0;

@@ -48,7 +48,39 @@ export interface ComponentSpec {
    * leituras se dividem entre as réplicas. Padrão: DEFAULT_WRITE_FRACTION.
    */
   writeFraction?: number;
+  /**
+   * Modelagem avançada, só `app` e `worker`: o número de instâncias varia entre
+   * `instances` (o mínimo) e `autoscaling.maxInstances` para manter a ocupação
+   * perto de `autoscaling.targetUtilization`.
+   */
+  autoscaling?: AutoscalingSpec;
+  /**
+   * Modelagem avançada, só `cache`: fração das requisições respondidas pelo
+   * cache, em [0, 1]. As ligações que saem do cache levam só as faltas.
+   */
+  hitRate?: number;
+  /** Modelagem avançada, só `database`: conexões simultâneas permitidas. */
+  connectionPool?: ConnectionPoolSpec;
+  /** Modelagem avançada, só `external`: chamadas por segundo permitidas pelo fornecedor. */
+  rateLimitRps?: number;
   position?: Position;
+}
+
+export interface AutoscalingSpec {
+  /** Inteiro >= `instances`. */
+  maxInstances: number;
+  /** Ocupação que o autoscaling tenta manter, em (0, 1). */
+  targetUtilization: number;
+}
+
+export interface ConnectionPoolSpec {
+  /** Conexões simultâneas. Inteiro >= 1. */
+  size: number;
+  /**
+   * Tempo que cada consulta prende a conexão além do tempo de resposta do banco
+   * (transação aberta, lógica da aplicação no meio), em ms. >= 0.
+   */
+  extraHoldMs: number;
 }
 
 /** Fração de escritas assumida para um banco quando o campo não é enviado. */
@@ -98,7 +130,8 @@ export interface ComponentResult {
   serviceDemandMs: number;
   /**
    * Utilização média por instância. Pode passar de 1 quando saturado. Sempre 0
-   * para `external`. Num banco com réplicas, é a maior entre primário e réplicas.
+   * para `external` sem limite de chamadas. Num banco com réplicas, é a maior
+   * entre primário e réplicas (e o pool de conexões, se houver).
    */
   utilization: number;
   saturated: boolean;
@@ -122,6 +155,60 @@ export interface ComponentResult {
   safeEntryRps: number | null;
   /** Só para `database`: primário e réplicas separados. */
   database?: DatabaseResult;
+  /** Com autoscaling: `instances` são as instâncias ativas nesse tráfego. */
+  autoscaling?: AutoscalingResult;
+  /** Cache com taxa de acerto. */
+  cache?: CacheResult;
+  /** Banco com pool de conexões. Utilização e capacidade do componente já o consideram. */
+  connectionPool?: ConnectionPoolResult;
+  /** Serviço externo com limite de chamadas. */
+  rateLimit?: RateLimitResult;
+}
+
+export interface AutoscalingResult {
+  minInstances: number;
+  maxInstances: number;
+  targetUtilization: number;
+  /** Instâncias ligadas nesse tráfego: ⌈carga ÷ alvo⌉, entre o mínimo e o máximo. */
+  activeInstances: number;
+  /** Chegou ao máximo e a carga pede mais. */
+  atMax: boolean;
+  /** Máximo que deixaria o componente abaixo do limite seguro. */
+  requiredMaxInstances: number;
+}
+
+export interface CacheResult {
+  hitRate: number;
+  hitsRps: number;
+  /** Requisições que seguem pelas ligações de saída do cache. */
+  missesRps: number;
+}
+
+export interface ConnectionPoolResult {
+  size: number;
+  extraHoldMs: number;
+  /** Conexões em uso, em média (Lei de Little). `null` se o banco satura. */
+  inUse: number | null;
+  /** inUse ÷ size. `null` se o banco satura. */
+  utilization: number | null;
+  saturated: boolean;
+  status: ComponentStatus;
+  /** Espera média por uma conexão livre, em ms. `null` se saturado. */
+  waitTimeMs: number | null;
+  /** Tráfego de entrada que esgota o pool. `null` se ilimitado. */
+  maxEntryRps: number | null;
+  /** Tamanho que deixaria o pool abaixo do limite seguro. `null` se o banco satura. */
+  requiredSize: number | null;
+  /** O pool limita o banco antes das instâncias. */
+  limiting: boolean;
+}
+
+export interface RateLimitResult {
+  limitRps: number;
+  /** Chamadas ÷ limite. */
+  utilization: number;
+  /** Limite que deixaria o serviço abaixo do limite seguro. */
+  requiredLimitRps: number;
 }
 
 /** Uma das filas de um banco: o primário ou o conjunto de réplicas. */

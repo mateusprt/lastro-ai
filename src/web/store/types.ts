@@ -10,6 +10,22 @@ export interface ComponentData extends Record<string, unknown> {
   monthlyCostPerInstance: number;
   /** Só para banco de dados: fração das consultas que são escritas. */
   writeFraction?: number;
+
+  // Modelagem avançada. Os valores ficam guardados mesmo com ela desligada;
+  // só são enviados à API quando o diagrama está com a modelagem avançada ligada.
+  /** Aplicação e worker. */
+  autoscalingEnabled?: boolean;
+  autoscalingMax?: number;
+  autoscalingTarget?: number;
+  /** Cache. */
+  hitRate?: number;
+  /** Banco de dados. */
+  poolEnabled?: boolean;
+  poolSize?: number;
+  poolExtraHoldMs?: number;
+  /** Serviço externo. */
+  rateLimitEnabled?: boolean;
+  rateLimitRps?: number;
 }
 
 export interface LinkData extends Record<string, unknown> {
@@ -28,4 +44,6 @@ export interface DiagramDoc {
   entryPointId: string | null;
   trafficRps: number;
   safeUtilization: number;
+  /** Autoscaling, taxa de acerto, pool de conexões e limites de terceiros entram no cálculo. */
+  advancedModeling: boolean;
 }

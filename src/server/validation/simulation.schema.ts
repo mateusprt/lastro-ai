@@ -17,6 +17,17 @@ const component = Joi.object({
   serviceTimeMs: Joi.number().min(0).required(),
   monthlyCostPerInstance: Joi.number().min(0).required(),
   writeFraction: Joi.number().min(0).max(1),
+  // Modelagem avançada. As regras que dependem de outros campos (máximo >= mínimo) ficam no GraphValidator.
+  autoscaling: Joi.object({
+    maxInstances: Joi.number().integer().min(1).required(),
+    targetUtilization: Joi.number().greater(0).less(1).required(),
+  }),
+  hitRate: Joi.number().min(0).max(1),
+  connectionPool: Joi.object({
+    size: Joi.number().integer().min(1).required(),
+    extraHoldMs: Joi.number().min(0).required(),
+  }),
+  rateLimitRps: Joi.number().greater(0),
   position: Joi.object({ x: Joi.number().required(), y: Joi.number().required() }),
 });
 
